@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { handleApiError } from '@/lib/error-handler'
 
 export async function GET(
   request: NextRequest,
@@ -18,11 +19,10 @@ export async function GET(
         id: params.id,
         userId: session.user.id,
       },
-      select: {
-        id: true,
-        text: true,
-        createdAt: true,
-        analysis: true,
+      include: {
+        chats: {
+          orderBy: { createdAt: 'asc' }
+        }
       }
     })
 
@@ -30,12 +30,19 @@ export async function GET(
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
-    return NextResponse.json(conversation)
+    return NextResponse.json({
+      ...conversation,
+      createdAt: conversation.createdAt.toISOString(),
+      chats: conversation.chats.map(chat => ({
+        ...chat,
+        createdAt: chat.createdAt.toISOString(),
+      }))
+    })
   } catch (error) {
-    console.error('Error fetching conversation:', error)
+    const errorDetails = handleApiError(error)
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: errorDetails.message },
+      { status: errorDetails.status || 500 }
     )
   }
 }
@@ -67,10 +74,10 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Conversation deleted successfully' })
   } catch (error) {
-    console.error('Error deleting conversation:', error)
+    const errorDetails = handleApiError(error)
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: errorDetails.message },
+      { status: errorDetails.status || 500 }
     )
   }
 }

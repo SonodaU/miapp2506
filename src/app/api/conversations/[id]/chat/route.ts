@@ -2,18 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { OpenAI } from 'openai'
+import { config } from '@/lib/config'
+import { handleApiError } from '@/lib/error-handler'
 import { z } from 'zod'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+import type { EvaluationAxis } from '@/types/analysis'
 
 const chatSchema = z.object({
-  aspect: z.string(),
-  statementIndex: z.number().int().min(0),
-  userQuestion: z.string().min(1),
+  aspect: z.enum(['cct', 'sst', 'empathy', 'partnership']),
+  question: z.string().min(1).max(1000),
   useReference: z.boolean().optional().default(false),
+  statementIndex: z.number().int().min(0),
 })
 
 export async function GET(
@@ -28,7 +26,7 @@ export async function GET(
 
     const { searchParams } = new URL(request.url)
     const aspect = searchParams.get('aspect')
-    const statementIndexParam = searchParams.get('statementIndex')
+    const statementIndex = searchParams.get('statementIndex')
 
     const whereClause: any = {
       conversation: {
@@ -40,31 +38,28 @@ export async function GET(
     if (aspect) {
       whereClause.aspect = aspect
     }
-
-    if (statementIndexParam) {
-      whereClause.statementIndex = parseInt(statementIndexParam)
+    
+    if (statementIndex !== null) {
+      whereClause.statementIndex = parseInt(statementIndex)
     }
 
     const chats = await prisma.chat.findMany({
       where: whereClause,
       orderBy: { createdAt: 'asc' },
-      select: {
-        id: true,
-        aspect: true,
-        statementIndex: true,
-        userQuestion: true,
-        aiResponse: true,
-        useReference: true,
-        createdAt: true,
-      }
+      take: config.ui.maxChatHistory,
     })
 
-    return NextResponse.json(chats)
-  } catch (error) {
-    console.error('Error fetching chats:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      chats.map(chat => ({
+        ...chat,
+        createdAt: chat.createdAt.toISOString(),
+      }))
+    )
+  } catch (error) {
+    const errorDetails = handleApiError(error)
+    return NextResponse.json(
+      { error: errorDetails.message },
+      { status: errorDetails.status || 500 }
     )
   }
 }
@@ -80,7 +75,7 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { aspect, statementIndex, userQuestion, useReference } = chatSchema.parse(body)
+    const { aspect, question, useReference, statementIndex } = chatSchema.parse(body)
 
     // 会話が存在し、ユーザーが所有者であることを確認
     const conversation = await prisma.conversation.findFirst({
@@ -94,7 +89,7 @@ export async function POST(
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
-    // 既存のチャット履歴を取得（同じ発言の同じ評価軸）
+    // 既存のチャット履歴を取得（同じ評価軸かつ同じ発言）
     const existingChats = await prisma.chat.findMany({
       where: {
         conversationId: params.id,
@@ -102,14 +97,14 @@ export async function POST(
         statementIndex,
       },
       orderBy: { createdAt: 'asc' },
+      take: config.ui.maxChatHistory,
     })
 
     // AIレスポンスを生成
     const aiResponse = await generateAIResponse(
       conversation,
-      aspect,
-      statementIndex,
-      userQuestion,
+      aspect as EvaluationAxis,
+      question,
       existingChats,
       useReference
     )
@@ -120,22 +115,16 @@ export async function POST(
         conversationId: params.id,
         aspect,
         statementIndex,
-        userQuestion,
+        userQuestion: question,
         aiResponse,
         useReference,
       },
-      select: {
-        id: true,
-        aspect: true,
-        statementIndex: true,
-        userQuestion: true,
-        aiResponse: true,
-        useReference: true,
-        createdAt: true,
-      }
     })
 
-    return NextResponse.json(chat, { status: 201 })
+    return NextResponse.json({
+      ...chat,
+      createdAt: chat.createdAt.toISOString(),
+    }, { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -144,78 +133,50 @@ export async function POST(
       )
     }
 
-    console.error('Error creating chat:', error)
+    const errorDetails = handleApiError(error)
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: errorDetails.message },
+      { status: errorDetails.status || 500 }
     )
   }
 }
 
 async function generateAIResponse(
   conversation: any,
-  aspect: string,
-  statementIndex: number,
+  aspect: EvaluationAxis,
   userQuestion: string,
   existingChats: any[],
   useReference: boolean
-) {
-  const aspectDescriptions = {
-    content: 'Content（内容）: 発言の内容の適切性、情報の正確性、論理的構成',
-    emotion: 'Emotion（感情）: 感情表現の適切性、共感性、感情的サポート',
-    structure: 'Structure（構造）: 会話の流れ、質問の仕方、応答の適切性',
-    expression: 'Expression（表現）: 言葉遣い、表現の明確性、専門用語の使用'
-  }
-
-  let systemPrompt = `あなたは会話分析の専門家です。特に${aspectDescriptions[aspect as keyof typeof aspectDescriptions]}に関する質問に答えてください。`
-
-  if (useReference) {
-    systemPrompt += `\n\n学術的な根拠や参考文献を含めて回答してください。心理学、カウンセリング、コミュニケーション理論の観点から専門的な説明を行ってください。`
-  }
-
-  // 該当する発言を取得
-  const aspectEvaluations = conversation.analysis[aspect] || []
-  const targetStatement = aspectEvaluations[statementIndex]?.statement || '該当する発言が見つかりません'
-  const targetEvaluation = aspectEvaluations[statementIndex]?.evaluation || '評価が見つかりません'
-
-  const messages: any[] = [
-    {
-      role: 'system',
-      content: systemPrompt
-    },
-    {
-      role: 'user',
-      content: `分析対象の会話:\n${conversation.text}\n\n対象発言: "${targetStatement}"\n評価: ${targetEvaluation}\n\n全体の分析結果:\n${JSON.stringify(conversation.analysis, null, 2)}`
-    }
-  ]
-
-  // 既存のチャット履歴を追加
-  existingChats.forEach(chat => {
-    messages.push({
-      role: 'user',
-      content: chat.userQuestion
-    })
-    messages.push({
-      role: 'assistant',
-      content: chat.aiResponse
-    })
-  })
-
-  // 新しい質問を追加
-  messages.push({
-    role: 'user',
-    content: userQuestion
-  })
+): Promise<string> {
+  // チャット履歴を適切な形式に変換
+  const chatHistory = existingChats.flatMap(chat => [
+    { role: 'user', content: chat.userQuestion },
+    { role: 'assistant', content: chat.aiResponse }
+  ])
 
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages,
-      temperature: 0.7,
-      max_tokens: 1000,
+    // 新しいdetailed-chatエンドポイントを使用してプロンプト管理を一元化
+    const response = await fetch(`${config.pythonApi.url}/detailed-chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        conversation_text: conversation.text,
+        analysis_result: conversation.analysis,
+        aspect,
+        user_question: userQuestion,
+        chat_history: chatHistory,
+        use_reference: useReference,
+      }),
     })
 
-    return response.choices[0]?.message?.content || 'エラーが発生しました。もう一度お試しください。'
+    if (!response.ok) {
+      throw new Error(`FastAPI detailed-chat request failed: ${response.status}`)
+    }
+
+    const data = await response.json()
+    return data.response || 'エラーが発生しました。もう一度お試しください。'
   } catch (error) {
     console.error('Error generating AI response:', error)
     throw error

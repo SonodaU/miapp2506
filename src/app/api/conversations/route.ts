@@ -2,81 +2,52 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { OpenAI } from 'openai'
+import { config } from '@/lib/config'
+import { handleApiError, AppError } from '@/lib/error-handler'
 import { z } from 'zod'
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+import type { AnalysisResult, AnalysisApiResponse } from '@/types/analysis'
 
 const conversationSchema = z.object({
-  text: z.string().min(1),
+  text: z.string().min(1).max(config.analysis.maxTextLength),
 })
 
-async function analyzeConversation(text: string) {
-  const analysisPrompt = `
-以下の会話テキストを4つの評価軸で分析してください：
-
-1. Content（内容）: 発言の内容の適切性、情報の正確性、論理的構成
-2. Emotion（感情）: 感情表現の適切性、共感性、感情的サポート
-3. Structure（構造）: 会話の流れ、質問の仕方、応答の適切性
-4. Expression（表現）: 言葉遣い、表現の明確性、専門用語の使用
-
-会話テキスト:
-${text}
-
-各評価軸について、重要な発言を抽出し、以下のJSON形式で結果を返してください：
-
-{
-  "content": [
-    {
-      "statement": "具体的な発言内容",
-      "evaluation": "評価コメント",
-      "icon": "good|warning|bad"
-    }
-  ],
-  "emotion": [...],
-  "structure": [...],
-  "expression": [...]
-}
-
-各評価軸で最大5つの重要な発言を抽出してください。
-icon は以下の基準で判定してください：
-- good: 適切で効果的な発言
-- warning: 改善の余地がある発言
-- bad: 不適切または問題のある発言
-`
-
+async function analyzeConversation(text: string): Promise<AnalysisResult> {
   try {
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: 'あなたは会話分析の専門家です。セラピーやカウンセリングの会話を専門的に分析し、建設的なフィードバックを提供します。'
-        },
-        {
-          role: 'user',
-          content: analysisPrompt
-        }
-      ],
-      temperature: 0.3,
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), config.pythonApi.timeout)
+
+    const response = await fetch(`${config.pythonApi.url}/analyze`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ text }),
+      signal: controller.signal,
     })
 
-    const content = response.choices[0]?.message?.content
-    if (!content) {
-      throw new Error('No response from OpenAI')
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      throw new AppError(
+        `Python API returned ${response.status}`,
+        'PYTHON_API_ERROR',
+        response.status
+      )
     }
 
-    // JSON部分を抽出
-    const jsonMatch = content.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      throw new Error('Invalid response format')
+    const data: AnalysisApiResponse = await response.json()
+    
+    // Python APIの結果をそのまま返す（評価軸統一済み）
+    return {
+      cct: data.cct || [],
+      sst: data.sst || [],
+      empathy: data.empathy || [],
+      partnership: data.partnership || []
     }
-
-    return JSON.parse(jsonMatch[0])
   } catch (error) {
-    console.error('Error analyzing conversation:', error)
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new AppError('Analysis timeout', 'ANALYSIS_TIMEOUT', 408)
+    }
     throw error
   }
 }
@@ -99,12 +70,17 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(conversations)
-  } catch (error) {
-    console.error('Error fetching conversations:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      conversations.map(conv => ({
+        ...conv,
+        createdAt: conv.createdAt.toISOString(),
+      }))
+    )
+  } catch (error) {
+    const errorDetails = handleApiError(error)
+    return NextResponse.json(
+      { error: errorDetails.message },
+      { status: errorDetails.status || 500 }
     )
   }
 }
@@ -127,7 +103,7 @@ export async function POST(request: NextRequest) {
       data: {
         userId: session.user.id,
         text,
-        analysis,
+        analysis: analysis as any,
       },
       select: {
         id: true,
@@ -137,7 +113,13 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    return NextResponse.json(conversation, { status: 201 })
+    return NextResponse.json(
+      {
+        ...conversation,
+        createdAt: conversation.createdAt.toISOString(),
+      },
+      { status: 201 }
+    )
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
@@ -146,10 +128,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.error('Error creating conversation:', error)
+    const errorDetails = handleApiError(error)
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: errorDetails.message },
+      { status: errorDetails.status || 500 }
     )
   }
 }

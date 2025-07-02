@@ -22,11 +22,11 @@ AIを活用した高度な会話分析・評価システム。セラピーセッ
 - **認証**: NextAuth.js
 
 ### バックエンド
-- **API Framework**: Next.js API Routes
+- **API Framework**: Next.js API Routes + FastAPI (Python)
 - **ORM**: Prisma
 - **データベース**: PostgreSQL (Supabase)
 - **認証**: NextAuth.js + JWT
-- **AI API**: OpenAI GPT-4o
+- **AI API**: OpenAI GPT-4o (Python FastAPI経由)
 
 ### インフラストラクチャ
 - **ホスティング**: Vercel
@@ -68,11 +68,17 @@ GET /api/auth/me - 現在のユーザー情報取得
 
 ### 分析エンドポイント
 ```
-POST /api/conversations - 新規会話分析
+POST /api/conversations - 新規会話分析 (Python API経由)
 GET /api/conversations - 分析履歴一覧取得
 GET /api/conversations/:id - 特定の分析結果取得
 DELETE /api/conversations/:id - 分析結果削除
 POST /api/conversations/:id/chat - 詳細質問チャット
+```
+
+### Python API エンドポイント
+```
+POST /analyze - 会話テキストの4軸分析
+GET / - API ヘルスチェック
 ```
 
 ## データモデル
@@ -140,8 +146,13 @@ model Chat {
 git clone [repository-url]
 cd conversation-analyzer
 
-# 依存関係のインストール
+# Next.js依存関係のインストール
 npm install
+
+# Python API依存関係のインストール
+cd api
+pip install -r requirements.txt
+cd ..
 
 # 環境変数の設定
 cp .env.example .env.local
@@ -149,22 +160,38 @@ cp .env.example .env.local
 # - DATABASE_URL
 # - NEXTAUTH_SECRET
 # - NEXTAUTH_URL
-# - OPENAI_API_KEY
+# - PYTHON_API_URL
+
+# Python API用環境変数の設定
+cd api
+cp .env.example .env
+# OPENAI_API_KEYを設定
+cd ..
 
 # データベースのマイグレーション
 npx prisma migrate dev
 
 # 開発サーバーの起動
+# ターミナル1: Python API
+cd api && python main.py
+
+# ターミナル2: Next.js
 npm run dev
 ```
 
 ## デプロイメント
 
 ### Vercel デプロイ
-1. Vercelアカウントでプロジェクトを作成
-2. GitHubリポジトリと連携
-3. 環境変数を設定
-4. 自動デプロイの有効化
+1. **Next.jsアプリケーション**:
+   - Vercelアカウントでプロジェクトを作成
+   - GitHubリポジトリと連携
+   - 環境変数を設定（DATABASE_URL, NEXTAUTH_SECRET, NEXTAUTH_URL, PYTHON_API_URL）
+   - 自動デプロイの有効化
+
+2. **Python API**:
+   - Railway, Render, またはVercel Functionsでデプロイ
+   - 環境変数 OPENAI_API_KEY を設定
+   - Next.js側の PYTHON_API_URL を本番APIのURLに更新
 
 ### Supabase セットアップ
 1. Supabaseプロジェクトを作成
@@ -184,7 +211,8 @@ npm run dev
 - データベースインデックスの最適化
 - N+1問題の回避（Prisma include）
 - API応答のページネーション
-- GPT-4 API呼び出しの並行処理
+- Python FastAPIでのGPT-4 API並行処理
+- Next.js ⇔ Python API間の効率的な通信
 
 ## 今後の拡張計画
 

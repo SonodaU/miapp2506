@@ -13,10 +13,10 @@ AIを活用した高度な会話分析・評価システム。セラピーセッ
 ## 技術スタック
 
 - **Frontend**: Next.js 14, TypeScript, shadcn/ui, Tailwind CSS
-- **Backend**: Next.js API Routes, Prisma ORM
+- **Backend**: Next.js API Routes, FastAPI (Python), Prisma ORM
 - **Database**: PostgreSQL
 - **Authentication**: NextAuth.js
-- **AI**: OpenAI GPT-4o
+- **AI**: OpenAI GPT-4o (Python API経由)
 
 ## セットアップ手順
 
@@ -55,7 +55,21 @@ sudo service postgresql start
 createdb conversation_analyzer
 ```
 
-### 3. 環境変数の設定
+### 3. Python API サーバーのセットアップ
+
+```bash
+# Python API ディレクトリに移動
+cd api
+
+# Python依存関係のインストール
+pip install -r requirements.txt
+
+# Python API用の環境変数を設定
+cp .env.example .env
+# .envファイルを編集してOPENAI_API_KEYを設定
+```
+
+### 4. 環境変数の設定
 
 `.env.local` ファイルを作成し、以下の環境変数を設定してください：
 
@@ -67,11 +81,14 @@ DATABASE_URL="postgresql://postgres:password@localhost:5432/conversation_analyze
 NEXTAUTH_SECRET="your-secret-key-here"
 NEXTAUTH_URL="http://localhost:3000"
 
-# OpenAI
+# OpenAI (Python API用)
 OPENAI_API_KEY="your-openai-api-key-here"
+
+# Python API
+PYTHON_API_URL="http://localhost:8000"
 ```
 
-### 4. データベースのセットアップ
+### 5. データベースのセットアップ
 
 ```bash
 # Prismaクライアントを生成
@@ -84,13 +101,24 @@ npx prisma migrate dev --name init
 npx prisma studio
 ```
 
-### 5. 開発サーバーの起動
+### 6. 開発サーバーの起動
 
+**Python APIサーバーを起動:**
 ```bash
+cd api
+python main.py
+# または
+uvicorn main:app --reload
+```
+
+**Next.jsアプリケーションを起動:**
+```bash
+# ルートディレクトリで
 npm run dev
 ```
 
 ブラウザで `http://localhost:3000` にアクセスしてください。
+Python APIは `http://localhost:8000` で動作します。
 
 ## テスト手順
 
@@ -127,6 +155,10 @@ npm run dev
 
 4. **開発サーバーが起動している**
    ```bash
+   # Python APIサーバー
+   cd api && python main.py
+   
+   # Next.jsアプリケーション
    npm run dev
    ```
 
@@ -339,14 +371,20 @@ npx prisma migrate status
 
 ### Vercel デプロイ
 
-1. GitHubリポジトリをVercelに接続
-2. 環境変数を設定：
-   - `DATABASE_URL`
-   - `NEXTAUTH_SECRET`
-   - `NEXTAUTH_URL` (本番URL)
-   - `OPENAI_API_KEY`
-3. ビルドコマンド: `npm run build`
-4. 自動デプロイの設定
+1. **Next.jsアプリケーション:**
+   - GitHubリポジトリをVercelに接続
+   - 環境変数を設定：
+     - `DATABASE_URL`
+     - `NEXTAUTH_SECRET`
+     - `NEXTAUTH_URL` (本番URL)
+     - `PYTHON_API_URL` (Python APIの本番URL)
+   - ビルドコマンド: `npm run build`
+   - 自動デプロイの設定
+
+2. **Python API:**
+   - RailwayやRenderなどでPython APIをデプロイ
+   - または、Vercel Functionsでデプロイ
+   - 環境変数 `OPENAI_API_KEY` を設定
 
 ### データベース (Supabase)
 
