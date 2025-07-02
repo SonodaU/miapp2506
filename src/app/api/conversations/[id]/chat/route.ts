@@ -11,6 +11,7 @@ const openai = new OpenAI({
 
 const chatSchema = z.object({
   aspect: z.string(),
+  statementIndex: z.number().int().min(0),
   userQuestion: z.string().min(1),
   useReference: z.boolean().optional().default(false),
 })
@@ -27,6 +28,7 @@ export async function GET(
 
     const { searchParams } = new URL(request.url)
     const aspect = searchParams.get('aspect')
+    const statementIndexParam = searchParams.get('statementIndex')
 
     const whereClause: any = {
       conversation: {
@@ -39,12 +41,17 @@ export async function GET(
       whereClause.aspect = aspect
     }
 
+    if (statementIndexParam) {
+      whereClause.statementIndex = parseInt(statementIndexParam)
+    }
+
     const chats = await prisma.chat.findMany({
       where: whereClause,
       orderBy: { createdAt: 'asc' },
       select: {
         id: true,
         aspect: true,
+        statementIndex: true,
         userQuestion: true,
         aiResponse: true,
         useReference: true,
@@ -73,7 +80,7 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { aspect, userQuestion, useReference } = chatSchema.parse(body)
+    const { aspect, statementIndex, userQuestion, useReference } = chatSchema.parse(body)
 
     // 会話が存在し、ユーザーが所有者であることを確認
     const conversation = await prisma.conversation.findFirst({
@@ -87,11 +94,12 @@ export async function POST(
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
     }
 
-    // 既存のチャット履歴を取得
+    // 既存のチャット履歴を取得（同じ発言の同じ評価軸）
     const existingChats = await prisma.chat.findMany({
       where: {
         conversationId: params.id,
         aspect,
+        statementIndex,
       },
       orderBy: { createdAt: 'asc' },
     })
@@ -100,6 +108,7 @@ export async function POST(
     const aiResponse = await generateAIResponse(
       conversation,
       aspect,
+      statementIndex,
       userQuestion,
       existingChats,
       useReference
@@ -110,6 +119,7 @@ export async function POST(
       data: {
         conversationId: params.id,
         aspect,
+        statementIndex,
         userQuestion,
         aiResponse,
         useReference,
@@ -117,6 +127,7 @@ export async function POST(
       select: {
         id: true,
         aspect: true,
+        statementIndex: true,
         userQuestion: true,
         aiResponse: true,
         useReference: true,
@@ -144,6 +155,7 @@ export async function POST(
 async function generateAIResponse(
   conversation: any,
   aspect: string,
+  statementIndex: number,
   userQuestion: string,
   existingChats: any[],
   useReference: boolean
@@ -161,6 +173,11 @@ async function generateAIResponse(
     systemPrompt += `\n\n学術的な根拠や参考文献を含めて回答してください。心理学、カウンセリング、コミュニケーション理論の観点から専門的な説明を行ってください。`
   }
 
+  // 該当する発言を取得
+  const aspectEvaluations = conversation.analysis[aspect] || []
+  const targetStatement = aspectEvaluations[statementIndex]?.statement || '該当する発言が見つかりません'
+  const targetEvaluation = aspectEvaluations[statementIndex]?.evaluation || '評価が見つかりません'
+
   const messages: any[] = [
     {
       role: 'system',
@@ -168,7 +185,7 @@ async function generateAIResponse(
     },
     {
       role: 'user',
-      content: `分析対象の会話:\n${conversation.text}\n\n分析結果:\n${JSON.stringify(conversation.analysis, null, 2)}`
+      content: `分析対象の会話:\n${conversation.text}\n\n対象発言: "${targetStatement}"\n評価: ${targetEvaluation}\n\n全体の分析結果:\n${JSON.stringify(conversation.analysis, null, 2)}`
     }
   ]
 

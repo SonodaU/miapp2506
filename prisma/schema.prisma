@@ -40,6 +40,7 @@ model Chat {
   id             String       @id @default(cuid())
   conversationId String
   aspect         String
+  statementIndex Int @default(0)
   userQuestion   String       @db.Text
   aiResponse     String       @db.Text
   useReference   Boolean      @default(false)
@@ -47,5 +48,6 @@ model Chat {
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   
   @@index([conversationId])
+  @@index([conversationId, aspect, statementIndex])
   @@map("chats")
 }

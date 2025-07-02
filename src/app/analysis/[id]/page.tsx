@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { ArrowLeft, MessageSquare, Send, ThumbsUp, ThumbsDown, AlertCircle, CheckCircle } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 
 interface Conversation {
   id: string
@@ -27,6 +28,7 @@ interface Conversation {
 interface Chat {
   id: string
   aspect: string
+  statementIndex: number
   userQuestion: string
   aiResponse: string
   useReference: boolean
@@ -40,10 +42,12 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
   const [chats, setChats] = useState<Chat[]>([])
   const [selectedAspect, setSelectedAspect] = useState('')
   const [selectedStatement, setSelectedStatement] = useState('')
+  const [selectedStatementIndex, setSelectedStatementIndex] = useState<number>(0)
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [question, setQuestion] = useState('')
   const [useReference, setUseReference] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const scrollAreaRef = useRef<HTMLDivElement>(null)
 
   const fetchConversation = useCallback(async () => {
     try {
@@ -69,9 +73,9 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
     }
   }, [session, params.id, fetchConversation])
 
-  const fetchChats = async (aspect: string) => {
+  const fetchChats = async (aspect: string, statementIndex: number) => {
     try {
-      const response = await fetch(`/api/conversations/${params.id}/chat?aspect=${aspect}`)
+      const response = await fetch(`/api/conversations/${params.id}/chat?aspect=${aspect}&statementIndex=${statementIndex}`)
       if (response.ok) {
         const data = await response.json()
         setChats(data)
@@ -81,15 +85,20 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
     }
   }
 
-  const openDetailDialog = (aspect: string, statement: string) => {
+  const openDetailDialog = (aspect: string, statement: string, statementIndex: number) => {
     setSelectedAspect(aspect)
     setSelectedStatement(statement)
+    setSelectedStatementIndex(statementIndex)
     setIsDialogOpen(true)
-    fetchChats(aspect)
+    fetchChats(aspect, statementIndex)
   }
 
   const sendQuestion = async () => {
-    if (!question.trim()) return
+    console.log('sendQuestion called with:', { question, selectedAspect, selectedStatementIndex })
+    if (!question.trim()) {
+      console.log('Question is empty, returning')
+      return
+    }
 
     setIsLoading(true)
     try {
@@ -100,6 +109,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
         },
         body: JSON.stringify({
           aspect: selectedAspect,
+          statementIndex: selectedStatementIndex,
           userQuestion: question,
           useReference,
         }),
@@ -109,9 +119,24 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
         const newChat = await response.json()
         setChats([...chats, newChat])
         setQuestion('')
+        
+        // 新しいメッセージ追加後に最下部にスクロール
+        setTimeout(() => {
+          if (scrollAreaRef.current) {
+            const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]')
+            if (scrollElement) {
+              scrollElement.scrollTop = scrollElement.scrollHeight
+            }
+          }
+        }, 100)
+      } else {
+        const errorData = await response.json()
+        console.error('Failed to send question:', errorData)
+        alert('質問の送信に失敗しました: ' + (errorData.error || 'Unknown error'))
       }
     } catch (error) {
       console.error('Error sending question:', error)
+      alert('ネットワークエラーが発生しました: ' + error.message)
     } finally {
       setIsLoading(false)
     }
@@ -202,7 +227,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                   <div
                     key={index}
                     className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-                    onClick={() => openDetailDialog(aspect, item.statement)}
+                    onClick={() => openDetailDialog(aspect, item.statement, index)}
                   >
                     <div className="flex items-start space-x-2">
                       {getEvaluationIcon(item.icon)}
@@ -234,9 +259,9 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
           </DialogHeader>
           
           <div className="flex-1 flex flex-col min-h-0">
-            <ScrollArea className="flex-1 pr-4">
-              <div className="space-y-4">
-                {chats.map((chat) => (
+            <ScrollArea ref={scrollAreaRef} className="flex-1 pr-4 h-96 overflow-y-auto">
+              <div className="space-y-4 pb-2">
+                {chats.map((chat, index) => (
                   <div key={chat.id} className="space-y-2">
                     <div className="bg-blue-50 p-3 rounded-lg">
                       <p className="text-sm font-medium text-blue-900">質問</p>
@@ -244,11 +269,28 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                     </div>
                     <div className="bg-gray-50 p-3 rounded-lg">
                       <p className="text-sm font-medium text-gray-900">AI回答</p>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                        {chat.aiResponse}
-                      </p>
+                      <div className="text-sm text-gray-700 prose prose-sm max-w-none overflow-y-auto">
+                        <ReactMarkdown
+                          components={{
+                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                            ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                            li: ({ children }) => <li className="text-sm">{children}</li>,
+                            h1: ({ children }) => <h1 className="text-base font-semibold mb-2">{children}</h1>,
+                            h2: ({ children }) => <h2 className="text-sm font-semibold mb-2">{children}</h2>,
+                            h3: ({ children }) => <h3 className="text-sm font-medium mb-1">{children}</h3>,
+                            strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                            em: ({ children }) => <em className="italic">{children}</em>,
+                            code: ({ children }) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                            pre: ({ children }) => <pre className="bg-gray-100 p-2 rounded text-xs font-mono overflow-x-auto mb-2">{children}</pre>,
+                            blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-300 pl-2 italic mb-2">{children}</blockquote>
+                          }}
+                        >
+                          {chat.aiResponse}
+                        </ReactMarkdown>
+                      </div>
                     </div>
-                    <Separator />
+                    {index < chats.length - 1 && <Separator />}
                   </div>
                 ))}
               </div>

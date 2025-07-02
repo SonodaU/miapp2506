@@ -26,13 +26,42 @@ AIを活用した高度な会話分析・評価システム。セラピーセッ
 npm install
 ```
 
-### 2. 環境変数の設定
+### 2. PostgreSQLデータベースの起動
+
+データベースが必要です。以下のいずれかの方法でPostgreSQLを起動してください：
+
+**Docker Composeを使用する場合（推奨）:**
+```bash
+# docker-compose.ymlファイルを作成してPostgreSQLを起動
+docker-compose up -d postgres
+```
+
+**Dockerを直接使用する場合:**
+```bash
+docker run --name conversation-db \
+  -e POSTGRES_DB=conversation_analyzer \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=password \
+  -p 5432:5432 \
+  -d postgres:15
+```
+
+**ローカルPostgreSQLを使用する場合:**
+```bash
+# PostgreSQLサービスを起動
+sudo service postgresql start
+
+# データベースを作成
+createdb conversation_analyzer
+```
+
+### 3. 環境変数の設定
 
 `.env.local` ファイルを作成し、以下の環境変数を設定してください：
 
 ```bash
-# Database
-DATABASE_URL="postgresql://username:password@localhost:5432/conversation_analyzer?schema=public"
+# Database (上記の設定に合わせて調整)
+DATABASE_URL="postgresql://postgres:password@localhost:5432/conversation_analyzer?schema=public"
 
 # NextAuth.js
 NEXTAUTH_SECRET="your-secret-key-here"
@@ -42,7 +71,7 @@ NEXTAUTH_URL="http://localhost:3000"
 OPENAI_API_KEY="your-openai-api-key-here"
 ```
 
-### 3. データベースのセットアップ
+### 4. データベースのセットアップ
 
 ```bash
 # Prismaクライアントを生成
@@ -55,7 +84,7 @@ npx prisma migrate dev --name init
 npx prisma studio
 ```
 
-### 4. 開発サーバーの起動
+### 5. 開発サーバーの起動
 
 ```bash
 npm run dev
@@ -64,6 +93,42 @@ npm run dev
 ブラウザで `http://localhost:3000` にアクセスしてください。
 
 ## テスト手順
+
+### 前提条件
+
+テストを開始する前に、以下が完了していることを確認してください：
+
+1. **データベースが起動している**
+   ```bash
+   # Dockerの場合、コンテナが起動していることを確認
+   docker ps | grep postgres
+   
+   # ローカルPostgreSQLの場合
+   sudo service postgresql status
+   ```
+
+2. **環境変数が正しく設定されている**
+   ```bash
+   # .env.localファイルの存在確認
+   ls -la .env.local
+   
+   # 必要な環境変数が設定されていることを確認
+   cat .env.local
+   ```
+
+3. **Prismaマイグレーションが完了している**
+   ```bash
+   # マイグレーション状況を確認
+   npx prisma migrate status
+   
+   # 必要に応じてマイグレーションを実行
+   npx prisma migrate dev
+   ```
+
+4. **開発サーバーが起動している**
+   ```bash
+   npm run dev
+   ```
 
 ### 基本機能テスト
 
