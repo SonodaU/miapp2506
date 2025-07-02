@@ -1,0 +1,51 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  password      String
+  name          String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  conversations Conversation[]
+  
+  @@map("users")
+}
+
+model Conversation {
+  id         String    @id @default(cuid())
+  userId     String
+  text       String    @db.Text
+  analysis   Json
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chats      Chat[]
+  
+  @@index([userId])
+  @@map("conversations")
+}
+
+model Chat {
+  id             String       @id @default(cuid())
+  conversationId String
+  aspect         String
+  userQuestion   String       @db.Text
+  aiResponse     String       @db.Text
+  useReference   Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  @@index([conversationId])
+  @@map("chats")
+}
