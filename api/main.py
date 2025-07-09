@@ -29,6 +29,7 @@ EvaluationAxis = Literal['cct', 'sst', 'empathy', 'partnership']
 
 class ConversationAnalysisRequest(BaseModel):
     text: str
+    target_behavior: Optional[str] = None
 
 class DetailedChatRequest(BaseModel):
     conversation_text: str
@@ -65,19 +66,39 @@ class PromptManager:
     def get_aspect_description(aspect: EvaluationAxis) -> str:
         """評価軸の説明を取得"""
         descriptions = {
-            'cct': 'チェンジトーク促進（CCT）: クライアントの変化への動機や意欲を引き出す発言の適切性',
-            'sst': '感情と共感（SST）: 感情への適切な対応と共感的理解の表現',
-            'empathy': '共感（Empathy）: クライアントの感情や状況への理解と共感の表現',
-            'partnership': 'パートナーシップ（Partnership）: 協働関係の構築と維持、共同作業の姿勢'
+            'cct':"""チェンジトークが促進されたか評価する。
+チェンジトークとは「クライエントから出る，変化を志向した言葉」のことです。以下の例が高評価となります。
+- 変化に向かうクライエントの発言だけを選択的に強化する。
+- 変化に向かうクライエントの発言を具体化する。
+- チェンジトークが出た際，深掘りする""",
+                   "sst": """維持トークを弱められたかを評価する。
+維持トークとは現状維持を選ぶクライエントの言葉のことです。以下の例が高評価となります。
+・変わることの難しさやデメリットの話を長引かせない。話の強さや勢いを弱める。
+・維持トークにつながる発言をしない""",
+                   "partnership": """互いに対等で，問題解決に役立つ知識を備えていると臨床家が思っているかを評価しなさい。
+変化についての専門知識のほとんどは，クライエントが持つと，臨床家が伝えているかを見ます。以下が高評価です。
+- 選択肢や計画を示し，相手が選びやすいようにする
+- クライエントを明確に専門家や意思決定者として認識する
+- クライエントが持っている情報に応じてどうアドバイスするか変える
+- 臨床家が専門家の役割をしない。""",
+                   "empathy": """クライエントの観点や経験を把握しようと努力しているか評価しなさい。以下の例で高い評価になります。
+- クライエントの観点、価値観、人生観について、興味を持って理解していると，クライエントに示す。例えば「複雑な聞き返し」を使って，まだ言っていないことを言ってみせる。
+- クライエントの価値観や見解に興味をもって，深掘りする"""
         }
         return descriptions.get(aspect, aspect)
     
     @staticmethod
-    def get_analysis_prompt(text: str, aspect: EvaluationAxis) -> str:
+    def get_analysis_prompt(text: str, aspect: EvaluationAxis, target_behavior: Optional[str] = None) -> str:
         """分析用プロンプトを生成"""
-        base_prompt = f"""
-以下の会話テキストを{PromptManager.get_aspect_description(aspect)}の観点から分析してください。重要な発言を抽出し、以下の項目で評価してください：
+        base_prompt = f"""以下の対話文を{PromptManager.get_aspect_description(aspect)}の観点から分析してください。重要な発言を抽出し、以下の項目で評価してください：
 """
+        
+        # target_behaviorが指定されている場合、プロンプトに追加
+        if target_behavior:
+            base_prompt += f"""
+
+【重要】クライエントの変えたい行動・目標: {target_behavior}
+この目標に関連する発言を特に重視して分析してください。"""
         
         criteria = {
             'cct': ["変化への動機付け", "クライアントの自律性尊重", "選択肢の提示", "前向きな発言の引き出し"],
@@ -90,18 +111,17 @@ class PromptManager:
             base_prompt += f"\n{i}. {criterion}"
         
         base_prompt += f"""
-
-会話テキスト:
+対話文:
 {text}
 
 重要な発言を最大5つ抽出し、以下のJSON形式で返してください：
 [
   {{
-    "statement": "具体的な発言内容",
-    "evaluation": "評価コメント",
+    "statement": "発言（意味のない発言は無視すること）",
+    "evaluation": "評価の根拠",
     "score": 1-5の評価点,
     "feedback": "具体的なフィードバック",
-    "suggestions": ["改善提案1", "改善提案2"],
+    "suggestions": ["改善提案1", "改善提案2"]代替案，修正案。いい評価のときに提案してもよい。考え方の道筋も示すこと。,
     "icon": "good/warning/bad"
   }}
 ]
@@ -187,10 +207,10 @@ async def analyze_conversation(request: ConversationAnalysisRequest):
     try:
         # 4つの分析を並行実行
         tasks = [
-            analyze_cct(request.text),
-            analyze_sst(request.text),
-            analyze_empathy(request.text),
-            analyze_partnership(request.text)
+            analyze_cct(request.text, request.target_behavior),
+            analyze_sst(request.text, request.target_behavior),
+            analyze_empathy(request.text, request.target_behavior),
+            analyze_partnership(request.text, request.target_behavior)
         ]
         
         cct_result, sst_result, empathy_result, partnership_result = await asyncio.gather(*tasks)
@@ -205,9 +225,9 @@ async def analyze_conversation(request: ConversationAnalysisRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"分析エラー: {str(e)}")
 
-async def analyze_cct(text: str) -> List[Dict[str, Any]]:
+async def analyze_cct(text: str, target_behavior: Optional[str] = None) -> List[Dict[str, Any]]:
     """チェンジトーク促進分析 - PromptManagerを使用"""
-    prompt = PromptManager.get_analysis_prompt(text, 'cct')
+    prompt = PromptManager.get_analysis_prompt(text, 'cct', target_behavior)
     
     response = await client.chat.completions.create(
         model="gpt-4o",
@@ -217,9 +237,9 @@ async def analyze_cct(text: str) -> List[Dict[str, Any]]:
     
     return parse_analysis_response(response.choices[0].message.content)
 
-async def analyze_sst(text: str) -> List[Dict[str, Any]]:
+async def analyze_sst(text: str, target_behavior: Optional[str] = None) -> List[Dict[str, Any]]:
     """感情と共感分析 - PromptManagerを使用"""
-    prompt = PromptManager.get_analysis_prompt(text, 'sst')
+    prompt = PromptManager.get_analysis_prompt(text, 'sst', target_behavior)
     
     response = await client.chat.completions.create(
         model="gpt-4o",
@@ -229,9 +249,9 @@ async def analyze_sst(text: str) -> List[Dict[str, Any]]:
     
     return parse_analysis_response(response.choices[0].message.content)
 
-async def analyze_empathy(text: str) -> List[Dict[str, Any]]:
+async def analyze_empathy(text: str, target_behavior: Optional[str] = None) -> List[Dict[str, Any]]:
     """共感分析 - PromptManagerを使用"""
-    prompt = PromptManager.get_analysis_prompt(text, 'empathy')
+    prompt = PromptManager.get_analysis_prompt(text, 'empathy', target_behavior)
     
     response = await client.chat.completions.create(
         model="gpt-4o",
@@ -241,9 +261,9 @@ async def analyze_empathy(text: str) -> List[Dict[str, Any]]:
     
     return parse_analysis_response(response.choices[0].message.content)
 
-async def analyze_partnership(text: str) -> List[Dict[str, Any]]:
+async def analyze_partnership(text: str, target_behavior: Optional[str] = None) -> List[Dict[str, Any]]:
     """パートナーシップ分析 - PromptManagerを使用"""
-    prompt = PromptManager.get_analysis_prompt(text, 'partnership')
+    prompt = PromptManager.get_analysis_prompt(text, 'partnership', target_behavior)
     
     response = await client.chat.completions.create(
         model="gpt-4o",

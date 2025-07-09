@@ -197,7 +197,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
               </Button>
             )}
             <div className="flex-1 flex justify-center">
-              <h1 className="text-lg font-medium text-gray-900 text-center">分析結果</h1>
+              {/* <h1 className="text-lg font-medium text-gray-900 text-center">分析結果</h1> */}
             </div>
             {isDesktopSplitView && (
               <Button

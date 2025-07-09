@@ -24,11 +24,11 @@ export const useConversations = () => {
     }
   }
 
-  const createConversation = async (text: string) => {
+  const createConversation = async (text: string, targetBehavior?: string) => {
     setIsLoading(true)
     setError(null)
     try {
-      const conversation = await apiClient.createConversation(text)
+      const conversation = await apiClient.createConversation(text, targetBehavior)
       setConversations(prev => [conversation, ...prev])
       return conversation
     } catch (error) {

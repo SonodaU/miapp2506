@@ -32,9 +32,9 @@ export default function DashboardPage() {
     clearError: clearApiKeyError,
   } = useApiKeyManagement()
 
-  const handleAnalyze = async (text: string) => {
+  const handleAnalyze = async (text: string, targetBehavior: string) => {
     try {
-      const conversation = await createConversation(text)
+      const conversation = await createConversation(text, targetBehavior)
       router.push(`/analysis/${conversation.id}`)
     } catch (error) {
       // エラーは useConversations で処理される

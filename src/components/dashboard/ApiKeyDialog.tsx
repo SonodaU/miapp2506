@@ -43,17 +43,23 @@ export const ApiKeyDialog = ({
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Key className="h-4 w-4 mr-2" />
-          {hasApiKey ? 'APIキー設定済' : 'APIキー設定'}
-        </Button>
+        <div className="relative">
+          <Button variant="outline" size="sm">
+            <Key className="h-4 w-4 mr-2" />
+            {hasApiKey ? 'APIキー設定済' : 'APIキー設定'}
+          </Button>
+          {!hasApiKey && (
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+          )}
+        </div>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>OpenAI APIキー設定</DialogTitle>
           <DialogDescription>
-            あなたのOpenAI APIキーを設定できます。<br />
-            未設定でも使えますが，<b>開発者に従量課金</b>されます。
+            あなたのOpenAI APIキーを登録できます。<br />
+            未設定でも使えますが，<b>開発者に従量課金</b>されます。<br />
+            設定するかどうかは完全にあなたの自由です。
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
@@ -68,7 +74,7 @@ export const ApiKeyDialog = ({
             <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-lg">
               <Key className="h-4 w-4 text-blue-600" />
               <span className="text-sm text-blue-800">
-                現在: デフォルトAPIキーを使用中
+                現在: 未設定
               </span>
             </div>
           )}

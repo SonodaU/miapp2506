@@ -9,9 +9,10 @@ import type { AnalysisResult, AnalysisApiResponse } from '@/types/analysis'
 
 const conversationSchema = z.object({
   text: z.string().min(1).max(config.analysis.maxTextLength),
+  targetBehavior: z.string().optional(),
 })
 
-async function analyzeConversation(text: string, apiKey?: string): Promise<AnalysisResult> {
+async function analyzeConversation(text: string, targetBehavior?: string, apiKey?: string): Promise<AnalysisResult> {
   try {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), config.pythonApi.timeout)
@@ -23,6 +24,7 @@ async function analyzeConversation(text: string, apiKey?: string): Promise<Analy
       },
       body: JSON.stringify({ 
         text,
+        target_behavior: targetBehavior,
         api_key: apiKey // ユーザーのAPIキーを送信
       }),
       signal: controller.signal,
@@ -96,7 +98,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { text } = conversationSchema.parse(body)
+    const { text, targetBehavior } = conversationSchema.parse(body)
 
     // ユーザーのAPIキーを取得（フィールドが存在しない場合でも安全に処理）
     let userApiKey = null
@@ -121,13 +123,14 @@ export async function POST(request: NextRequest) {
     }
 
     // 会話を分析
-    const analysis = await analyzeConversation(text, apiKey)
+    const analysis = await analyzeConversation(text, targetBehavior, apiKey)
 
     // データベースに保存
     const conversation = await prisma.conversation.create({
       data: {
         userId: session.user.id,
         text,
+        targetBehavior,
         analysis: analysis as any,
       },
       select: {
