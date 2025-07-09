@@ -17,11 +17,11 @@ export const ConversationList = ({ conversations }: ConversationListProps) => {
       <CardHeader>
         <CardTitle className="flex items-center">
           <History className="h-5 w-5 mr-2" />
-          最近の分析履歴
+          履歴
         </CardTitle>
-        <CardDescription>
+        {/* <CardDescription>
           過去に実行した分析結果を確認できます
-        </CardDescription>
+        </CardDescription> */}
       </CardHeader>
       <CardContent>
         {conversations.length === 0 ? (

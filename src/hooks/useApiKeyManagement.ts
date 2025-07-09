@@ -31,7 +31,6 @@ export const useApiKeyManagement = () => {
     try {
       await apiClient.updateApiKey(apiKey)
       await fetchApiKeyInfo()
-      return true
     } catch (error) {
       const errorDetails = handleApiError(error)
       setError(errorDetails.message)

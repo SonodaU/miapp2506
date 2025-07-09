@@ -11,7 +11,7 @@ export const ErrorMessage = ({ error, onRetry, onGoBack }: ErrorMessageProps) =>
   <div className="min-h-screen flex items-center justify-center">
     <div className="text-center">
       <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-      <h2 className="text-xl font-semibold mb-2">エラーが発生しました</h2>
+      <h2 className="text-lg font-medium mb-2">エラーが発生しました</h2>
       <p className="text-gray-600 mb-4">{error}</p>
       <div className="space-x-2">
         {onRetry && (

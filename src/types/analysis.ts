@@ -42,10 +42,10 @@ export interface ConversationWithChats extends Conversation {
 }
 
 export interface AnalysisApiResponse {
-  cct: AnalysisStatement[];
-  sst: AnalysisStatement[];
-  empathy: AnalysisStatement[];
-  partnership: AnalysisStatement[];
+  cct?: AnalysisStatement[];
+  sst?: AnalysisStatement[];
+  empathy?: AnalysisStatement[];
+  partnership?: AnalysisStatement[];
 }
 
 export type EvaluationAxis = 'cct' | 'sst' | 'empathy' | 'partnership';

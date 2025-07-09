@@ -70,10 +70,8 @@ export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'ログインが必要です' }, { status: 401 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
-    console.log('Fetching API key info for user:', session.user.id)
 
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
@@ -85,35 +83,15 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    console.log('User found:', user ? 'Yes' : 'No')
-
     if (!user) {
-      return NextResponse.json({ error: 'ユーザーが見つかりません' }, { status: 404 })
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-
-    const hasApiKey = !!user.openaiApiKey
-    const apiKeyPreview = user.openaiApiKey ? `sk-...${user.openaiApiKey.slice(-4)}` : null
-    
-    console.log('API key status:', { hasApiKey, apiKeyPreview })
 
     return NextResponse.json({
-      hasApiKey,
-      apiKeyPreview
+      hasApiKey: !!user.openaiApiKey,
+      apiKeyPreview: user.openaiApiKey ? `sk-...${user.openaiApiKey.slice(-4)}` : null
     })
   } catch (error) {
-    console.error('GET API key error:', error)
-    
-    // フィールドが存在しない場合のエラーハンドリング
-    if (error && typeof error === 'object' && 'message' in error) {
-      if (error.message?.includes('openaiApiKey')) {
-        return NextResponse.json({
-          hasApiKey: false,
-          apiKeyPreview: null,
-          warning: 'データベースの更新が必要です'
-        })
-      }
-    }
-    
     const errorDetails = handleApiError(error)
     return NextResponse.json(
       { error: errorDetails.message },

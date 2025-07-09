@@ -394,15 +394,3 @@ npx prisma migrate status
    ```bash
    DATABASE_URL="supabase-url" npx prisma migrate deploy
    ```
-
-## ライセンス
-
-MIT License
-
-## 貢献
-
-Issue報告やPull Requestを歓迎します。開発に参加する前に、以下のガイドラインをお読みください：
-
-1. コードスタイル: Prettier + ESLint
-2. コミットメッセージ: Conventional Commits
-3. テスト: 新機能には対応するテストを追加
