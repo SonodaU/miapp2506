@@ -11,7 +11,7 @@ const conversationSchema = z.object({
   text: z.string().min(1).max(config.analysis.maxTextLength),
 })
 
-async function analyzeConversation(text: string): Promise<AnalysisResult> {
+async function analyzeConversation(text: string, apiKey?: string): Promise<AnalysisResult> {
   try {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), config.pythonApi.timeout)
@@ -21,7 +21,10 @@ async function analyzeConversation(text: string): Promise<AnalysisResult> {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ 
+        text,
+        api_key: apiKey // ユーザーのAPIキーを送信
+      }),
       signal: controller.signal,
     })
 
@@ -95,8 +98,30 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { text } = conversationSchema.parse(body)
 
+    // ユーザーのAPIキーを取得（フィールドが存在しない場合でも安全に処理）
+    let userApiKey = null
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { openaiApiKey: true }
+      })
+      userApiKey = user?.openaiApiKey
+    } catch (error) {
+      // openaiApiKeyフィールドが存在しない場合は無視
+      console.log('openaiApiKey field not found, using default API key')
+    }
+
+    // ユーザーのAPIキーまたはデフォルトのAPIキーを使用
+    const apiKey = userApiKey || process.env.OPENAI_API_KEY
+
+    if (!apiKey) {
+      return NextResponse.json({ 
+        error: 'OpenAI APIキーが設定されていません。管理者にお問い合わせください。' 
+      }, { status: 500 })
+    }
+
     // 会話を分析
-    const analysis = await analyzeConversation(text)
+    const analysis = await analyzeConversation(text, apiKey)
 
     // データベースに保存
     const conversation = await prisma.conversation.create({

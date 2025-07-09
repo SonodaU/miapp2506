@@ -82,11 +82,25 @@ export async function POST(
       where: {
         id: params.id,
         userId: session.user.id,
+      },
+      include: {
+        user: {
+          select: { openaiApiKey: true }
+        }
       }
     })
 
     if (!conversation) {
       return NextResponse.json({ error: 'Conversation not found' }, { status: 404 })
+    }
+
+    // ユーザーのAPIキーまたはデフォルトのAPIキーを使用
+    const apiKey = conversation.user.openaiApiKey || process.env.OPENAI_API_KEY
+
+    if (!apiKey) {
+      return NextResponse.json({ 
+        error: 'OpenAI APIキーが設定されていません。管理者にお問い合わせください。' 
+      }, { status: 500 })
     }
 
     // 既存のチャット履歴を取得（同じ評価軸かつ同じ発言）
@@ -106,7 +120,8 @@ export async function POST(
       aspect as EvaluationAxis,
       question,
       existingChats,
-      useReference
+      useReference,
+      apiKey
     )
 
     // チャットを保存
@@ -146,7 +161,8 @@ async function generateAIResponse(
   aspect: EvaluationAxis,
   userQuestion: string,
   existingChats: any[],
-  useReference: boolean
+  useReference: boolean,
+  apiKey?: string
 ): Promise<string> {
   // チャット履歴を適切な形式に変換
   const chatHistory = existingChats.flatMap(chat => [
@@ -168,6 +184,7 @@ async function generateAIResponse(
         user_question: userQuestion,
         chat_history: chatHistory,
         use_reference: useReference,
+        api_key: apiKey,
       }),
     })
 

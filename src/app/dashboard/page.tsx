@@ -1,6 +1,5 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
@@ -8,44 +7,82 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Textarea } from '@/components/ui/textarea'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Separator } from '@/components/ui/separator'
-import { PlusCircle, History, User, LogOut } from 'lucide-react'
+import { MessageSquareIcon, History, User, LogOut, Key, Eye, EyeOff } from 'lucide-react'
 import { signOut } from 'next-auth/react'
-
-interface Conversation {
-  id: string
-  text: string
-  createdAt: string
-  analysis?: any
-}
+import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { useAuth } from '@/hooks/useAuth'
+import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorMessage } from '@/components/common/ErrorMessage'
+import { apiClient } from '@/lib/api-client'
+import { handleApiError } from '@/lib/error-handler'
+import { formatDate } from '@/lib/utils/date'
+import type { Conversation } from '@/types/analysis'
 
 export default function DashboardPage() {
-  const { data: session, status } = useSession()
+  const { session, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const [newText, setNewText] = useState('')
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [isLoading, setIsLoading] = useState(false)
-
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin')
-    }
-  }, [status, router])
+  const [apiKey, setApiKey] = useState('')
+  const [hasApiKey, setHasApiKey] = useState(false)
+  const [apiKeyPreview, setApiKeyPreview] = useState<string | null>(null)
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [isApiKeyDialogOpen, setIsApiKeyDialogOpen] = useState(false)
+  const [isUpdatingApiKey, setIsUpdatingApiKey] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (session) {
       fetchConversations()
+      fetchApiKeyInfo()
     }
   }, [session])
 
   const fetchConversations = async () => {
     try {
-      const response = await fetch('/api/conversations')
-      if (response.ok) {
-        const data = await response.json()
-        setConversations(data)
-      }
+      const data = await apiClient.getConversations()
+      setConversations(data)
     } catch (error) {
+      const errorDetails = handleApiError(error)
+      setError(errorDetails.message)
       console.error('Error fetching conversations:', error)
+    }
+  }
+
+  const fetchApiKeyInfo = async () => {
+    try {
+      const data = await apiClient.getApiKeyInfo()
+      setHasApiKey(data.hasApiKey)
+      setApiKeyPreview(data.apiKeyPreview)
+    } catch (error) {
+      const errorDetails = handleApiError(error)
+      setError(errorDetails.message)
+      console.error('Error fetching API key info:', error)
+    }
+  }
+
+  const handleUpdateApiKey = async () => {
+    if (!apiKey.trim()) {
+      alert('APIキーを入力してください')
+      return
+    }
+    
+    setIsUpdatingApiKey(true)
+    try {
+      await apiClient.updateApiKey(apiKey.trim())
+      setIsApiKeyDialogOpen(false)
+      setApiKey('')
+      setShowApiKey(false)
+      await fetchApiKeyInfo()
+      alert('APIキーが正常に更新されました')
+    } catch (error) {
+      const errorDetails = handleApiError(error)
+      alert(errorDetails.message)
+      console.error('Error updating API key:', error)
+    } finally {
+      setIsUpdatingApiKey(false)
     }
   }
 
@@ -54,33 +91,33 @@ export default function DashboardPage() {
 
     setIsLoading(true)
     try {
-      const response = await fetch('/api/conversations', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: newText }),
-      })
-
-      if (response.ok) {
-        const conversation = await response.json()
-        router.push(`/analysis/${conversation.id}`)
-      } else {
-        console.error('Analysis failed')
-      }
+      const conversation = await apiClient.createConversation(newText)
+      router.push(`/analysis/${conversation.id}`)
     } catch (error) {
+      const errorDetails = handleApiError(error)
+      setError(errorDetails.message)
       console.error('Error analyzing conversation:', error)
     } finally {
       setIsLoading(false)
     }
   }
 
-  if (status === 'loading') {
-    return <div className="min-h-screen flex items-center justify-center">読み込み中...</div>
+  if (authLoading) {
+    return <LoadingSpinner />
   }
 
   if (!session) {
     return null
+  }
+
+  if (error) {
+    return (
+      <ErrorMessage 
+        error={error} 
+        onRetry={() => setError(null)}
+        onGoBack={() => router.push('/auth/signin')}
+      />
+    )
   }
 
   return (
@@ -89,7 +126,7 @@ export default function DashboardPage() {
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <h1 className="text-2xl font-bold text-gray-900">会話分析・評価システム</h1>
+            <h1 className="text-2xl font-bold text-gray-900">動機づけ面接SVツール</h1>
             <div className="flex items-center space-x-4">
               <Avatar>
                 <AvatarFallback>
@@ -102,6 +139,81 @@ export default function DashboardPage() {
                 </span>
                 <span className="text-xs text-gray-500">{session.user?.email}</span>
               </div>
+              <Dialog open={isApiKeyDialogOpen} onOpenChange={setIsApiKeyDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Key className="h-4 w-4 mr-2" />
+                    {hasApiKey ? 'APIキー設定済' : 'デフォルト使用中'}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[425px]">
+                  <DialogHeader>
+                    <DialogTitle>OpenAI APIキー設定</DialogTitle>
+                    <DialogDescription>
+                      独自のOpenAI APIキーを設定できます。設定しない場合はデフォルトのAPIキーが使用されます。
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    {hasApiKey ? (
+                      <div className="flex items-center space-x-2 p-3 bg-green-50 rounded-lg">
+                        <Key className="h-4 w-4 text-green-600" />
+                        <span className="text-sm text-green-800">
+                          現在のAPIキー: {apiKeyPreview}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-2 p-3 bg-blue-50 rounded-lg">
+                        <Key className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm text-blue-800">
+                          現在: デフォルトAPIキーを使用中
+                        </span>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <label htmlFor="api-key" className="text-sm font-medium">
+                        APIキー
+                      </label>
+                      <div className="relative">
+                        <Input
+                          id="api-key"
+                          type={showApiKey ? 'text' : 'password'}
+                          placeholder="sk-..."
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          className="pr-10"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                        >
+                          {showApiKey ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex justify-end space-x-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsApiKeyDialogOpen(false)}
+                      >
+                        キャンセル
+                      </Button>
+                      <Button
+                        onClick={handleUpdateApiKey}
+                        disabled={!apiKey.trim() || isUpdatingApiKey}
+                      >
+                        {isUpdatingApiKey ? '更新中...' : '更新'}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
               <Button
                 variant="outline"
                 size="sm"
@@ -122,7 +234,7 @@ export default function DashboardPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <PlusCircle className="h-5 w-5 mr-2" />
+                  <MessageSquareIcon className="h-5 w-5 mr-2" />
                   新規分析
                 </CardTitle>
                 <CardDescription>
@@ -131,11 +243,7 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <Textarea
-                  placeholder="例：
-セラピスト: 今日はどのような気持ちでいらっしゃいましたか？
-クライアント: 最近、仕事でのストレスが溜まっていて、なかなか眠れない日が続いています。
-セラピスト: そうでしたか。それは辛い状況ですね。具体的にはどのようなことがストレスの原因になっているのでしょうか？
-クライアント: 上司からの期待が高くて、プレッシャーを感じています。失敗したらどうしようという不安が頭から離れません。"
+                  placeholder="セラピスト: 今日はどういうことでいらっしゃいましたか？"
                   value={newText}
                   onChange={(e) => setNewText(e.target.value)}
                   className="min-h-[300px] resize-none"
@@ -182,7 +290,7 @@ export default function DashboardPage() {
                               分析 #{conversations.length - index}
                             </span>
                             <span className="text-xs text-gray-500">
-                              {new Date(conversation.createdAt).toLocaleDateString('ja-JP')}
+                              {formatDate(conversation.createdAt)}
                             </span>
                           </div>
                           <p className="text-sm text-gray-600 line-clamp-2">

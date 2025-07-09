@@ -4,7 +4,9 @@
       "Bash(npm run build:*)",
       "Bash(npx prisma:*)",
       "Bash(npm install:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)"
     ],
     "deny": []
   }

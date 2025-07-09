@@ -1,6 +1,5 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
@@ -10,17 +9,24 @@ import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ArrowLeft, Send, AlertCircle, CheckCircle, ThumbsDown } from 'lucide-react'
+import { ArrowLeft, Send, Info } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
+import { useAuth } from '@/hooks/useAuth'
+import { LoadingSpinner } from '@/components/common/LoadingSpinner'
+import { ErrorMessage } from '@/components/common/ErrorMessage'
+import { getEvaluationIcon } from '@/components/ui/icons'
 import { apiClient } from '@/lib/api-client'
 import { handleApiError } from '@/lib/error-handler'
+import { getAspectTitle, getAspectShortTitle } from '@/lib/utils/evaluation'
+import { formatDate } from '@/lib/utils/date'
 import type { ConversationWithChats, Chat, EvaluationAxis } from '@/types/analysis'
 
 export default function AnalysisPage({ params }: { params: { id: string } }) {
-  const { data: session, status } = useSession()
+  const { session, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const [conversation, setConversation] = useState<ConversationWithChats | null>(null)
-  const [chats, setChats] = useState<Chat[]>([])
+  const [allChats, setAllChats] = useState<Chat[]>([])
+  const [currentChats, setCurrentChats] = useState<Chat[]>([])
   const [selectedAspect, setSelectedAspect] = useState<EvaluationAxis | ''>('')
   const [selectedStatement, setSelectedStatement] = useState<any>(null)
   const [selectedStatementIndex, setSelectedStatementIndex] = useState<number>(0)
@@ -29,25 +35,63 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
   const [useReference, setUseReference] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([])
   const scrollAreaRef = useRef<HTMLDivElement>(null)
+
+  // ツールチップコンポーネント
+  const InfoTooltip = ({ children, content }: { children: React.ReactNode; content: string }) => {
+    const [isVisible, setIsVisible] = useState(false)
+    
+    return (
+      <div 
+        className="relative inline-block"
+        onMouseEnter={() => setIsVisible(true)}
+        onMouseLeave={() => setIsVisible(false)}
+      >
+        {children}
+        {isVisible && (
+          <div className="absolute top-1/2 left-full transform -translate-y-1/2 ml-2 px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded border border-gray-200 shadow-sm z-10 w-64">
+            {content}
+            <div className="absolute top-1/2 right-full transform -translate-y-1/2 w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-gray-100"></div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // おすすめの質問リスト
+  const questionSuggestions = [
+    "より良い発言をするには？",
+    "この発言の改善点を教えて",
+    "聞き返しの例は？",
+    "この場面でのベストな対応方法は？",
+    "共感を示すための具体的な表現は？",
+    "相手の立場に立った発言例を教えて",
+    "この発言が相手に与える影響は？",
+    "信頼関係を築くための言い回しは？",
+    "相手の気持ちを引き出す質問方法は？",
+    "この発言の背景にある意図は？",
+    "相手の感情に配慮した表現方法は？",
+    "より効果的なコミュニケーション方法は？"
+  ]
+
+  // ランダムに2つの質問を選択する関数
+  const getRandomQuestions = () => {
+    const shuffled = [...questionSuggestions].sort(() => 0.5 - Math.random())
+    return shuffled.slice(0, 2)
+  }
 
   const fetchConversation = useCallback(async () => {
     try {
       const data = await apiClient.getConversation(params.id)
       setConversation(data)
-      setChats(data.chats || [])
+      setAllChats(data.chats || [])
     } catch (error) {
       const errorDetails = handleApiError(error)
       setError(errorDetails.message)
       console.error('Error fetching conversation:', error)
     }
   }, [params.id])
-
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin')
-    }
-  }, [status, router])
 
   useEffect(() => {
     if (session && params.id) {
@@ -103,9 +147,11 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
     setSelectedStatement(statement)
     setSelectedStatementIndex(statementIndex)
     setIsDialogOpen(true)
-    // チャットは既に全て取得済み（fetchConversationで取得）
-    const aspectChats = chats.filter(chat => chat.aspect === aspect && chat.statementIndex === statementIndex)
-    setChats(aspectChats)
+    // ランダムな質問を設定
+    setSuggestedQuestions(getRandomQuestions())
+    // 該当するチャット履歴をフィルタリング
+    const aspectChats = allChats.filter(chat => chat.aspect === aspect && chat.statementIndex === statementIndex)
+    setCurrentChats(aspectChats)
   }
 
   const sendQuestion = async () => {
@@ -123,7 +169,8 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
         useReference
       )
       
-      setChats([...chats, newChat])
+      setCurrentChats([...currentChats, newChat])
+      setAllChats([...allChats, newChat])
       setQuestion('')
       
       // 新しいメッセージ追加後に最下部にスクロール
@@ -144,51 +191,12 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
     }
   }
 
-  const getEvaluationIcon = (icon: string) => {
-    switch (icon) {
-      case 'good':
-        return <CheckCircle className="h-4 w-4 text-green-500" />
-      case 'warning':
-        return <AlertCircle className="h-4 w-4 text-yellow-500" />
-      case 'bad':
-        return <ThumbsDown className="h-4 w-4 text-red-500" />
-      default:
-        return <CheckCircle className="h-4 w-4 text-gray-400" />
-    }
+  const handleSuggestedQuestionClick = (suggestedQuestion: string) => {
+    setQuestion(suggestedQuestion)
   }
 
-  const getAspectTitle = (aspect: string) => {
-    switch (aspect) {
-      case 'cct':
-        return 'チェンジトーク促進'
-      case 'sst':
-        return '維持トーク限弱'
-      case 'empathy':
-        return '共感'
-      case 'partnership':
-        return 'パートナーシップ'
-      default:
-        return aspect
-    }
-  }
-
-  const getAspectShortTitle = (aspect: string) => {
-    switch (aspect) {
-      case 'cct':
-        return 'チェンジ\nトーク'
-      case 'sst':
-        return '維持トーク'
-      case 'empathy':
-        return '共感'
-      case 'partnership':
-        return 'パートナー\nシップ'
-      default:
-        return aspect
-    }
-  }
-
-  if (status === 'loading' || !conversation) {
-    return <div className="min-h-screen flex items-center justify-center">読み込み中...</div>
+  if (authLoading || !conversation) {
+    return <LoadingSpinner />
   }
 
   if (!session) {
@@ -197,16 +205,11 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold mb-2">エラーが発生しました</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <Button onClick={() => router.push('/dashboard')}>
-            ダッシュボードに戻る
-          </Button>
-        </div>
-      </div>
+      <ErrorMessage 
+        error={error} 
+        onRetry={() => setError(null)}
+        onGoBack={() => router.push('/dashboard')}
+      />
     )
   }
 
@@ -222,9 +225,12 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
               className="mr-4"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
-              ダッシュボードに戻る
+              戻る
             </Button>
-            <h1 className="text-2xl font-bold text-gray-900">分析結果</h1>
+            <div className="flex-1 flex justify-center mr-10">
+              <h1 className="text-2xl font-bold text-gray-900 text-center">分析結果</h1>
+            </div>
+            
           </div>
         </div>
       </header>
@@ -233,9 +239,9 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
         {/* Original Text */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>分析対象テキスト</CardTitle>
+            {/* <CardTitle>分析対象テキスト</CardTitle> */}
             <CardDescription>
-              {new Date(conversation.createdAt).toLocaleDateString('ja-JP')} に分析
+              {formatDate(conversation.createdAt)} に分析
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -250,8 +256,12 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
         {/* Analysis Results */}
         <Card>
           <CardHeader>
-            <CardTitle>分析結果</CardTitle>
-            <CardDescription>各評価軸での分析結果を確認できます。発言をクリックすると詳細を表示します。</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              分析結果
+              <InfoTooltip content="発言をクリックすると詳細を表示します。">
+                <Info className="h-4 w-4 text-gray-500 cursor-help" />
+              </InfoTooltip>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue={Object.keys(conversation.analysis)[0]} className="w-full">
@@ -273,7 +283,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                 
                 return (
                   <TabsContent key={aspect} value={aspect} className="mt-6">
-                    <div className="space-y-4">
+                    <div className="space-y-1">
                       {allStatements.length > 0 ? (
                         allStatements.map((statementData, index) => {
                           const evaluation = statementData.evaluations[aspect]
@@ -292,9 +302,11 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                               <div className="flex items-start space-x-3">
                                 {hasEvaluation ? (
                                   getEvaluationIcon(evaluation.icon || 'good')
-                                ) : (
+                                ) 
+                                : (
                                   <div className="h-4 w-4 rounded-full bg-gray-300 mt-0.5"></div>
-                                )}
+                                )
+                                }
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-medium text-gray-900 mb-2">
                                     {statementData.statement}
@@ -304,11 +316,8 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                                       {evaluation.evaluation || evaluation.feedback || '評価が見つかりません'}
                                     </p>
                                   )}
-                                  {!hasEvaluation && (
-                                    <p className="text-xs text-gray-400 italic">
-                                      この発言には評価がありません
-                                    </p>
-                                  )}
+                                  {/* {!hasEvaluation && (
+                                  )} */}
                                 </div>
                               </div>
                             </div>
@@ -358,7 +367,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
           <div className="flex-1 flex flex-col min-h-0">
             <ScrollArea ref={scrollAreaRef} className="flex-1 pr-4 h-96 overflow-y-auto">
               <div className="space-y-4 pb-2">
-                {chats.filter(chat => chat.aspect === selectedAspect && chat.statementIndex === selectedStatementIndex).map((chat, index) => (
+                {currentChats.map((chat, index) => (
                   <div key={chat.id} className="space-y-2">
                     <div className="bg-blue-50 p-3 rounded-lg">
                       <p className="text-sm font-medium text-blue-900">質問</p>
@@ -387,7 +396,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                         </ReactMarkdown>
                       </div>
                     </div>
-                    {index < chats.filter(c => c.aspect === selectedAspect && c.statementIndex === selectedStatementIndex).length - 1 && <Separator />}
+                    {index < currentChats.length - 1 && <Separator />}
                   </div>
                 ))}
               </div>
@@ -395,6 +404,24 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
 
             <div className="border-t pt-4 mt-4">
               <div className="space-y-3">
+                {/* おすすめの質問 - チャット履歴がない時だけ表示 */}
+                {suggestedQuestions.length > 0 && currentChats.length === 0 && (
+                  <div className="mb-4">
+                    {/* <p className="text-sm font-medium text-gray-700 mb-2">おすすめの質問</p> */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {suggestedQuestions.map((suggestedQuestion, index) => (
+                        <button
+                          key={index}
+                          onClick={() => handleSuggestedQuestionClick(suggestedQuestion)}
+                          className="text-left p-2 text-sm bg-gray-50 hover:bg-gray-100 text-gray-400 rounded-lg transition-colors border border-gray-200"
+                        >
+                          {suggestedQuestion}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex items-center space-x-2">
                   <input
                     type="checkbox"
@@ -410,7 +437,7 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                 
                 <div className="flex space-x-2">
                   <Textarea
-                    placeholder="詳細な質問を入力してください..."
+                    placeholder="質問を入力してください..."
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     className="flex-1"
