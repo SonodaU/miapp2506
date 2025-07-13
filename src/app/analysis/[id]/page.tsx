@@ -254,12 +254,42 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                   <div className="flex items-start space-x-3">
                     {getEvaluationIcon(selectedStatement.icon || 'good')}
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900 mb-2">
+                      <p className="text-sm font-medium text-gray-900 mb-3">
                         {selectedStatement.statement || selectedStatement.content || '発言内容が見つかりません'}
                       </p>
-                      <p className="text-sm text-gray-600">
-                        {selectedStatement.evaluation || selectedStatement.feedback || '評価が見つかりません'}
-                      </p>
+                      <div className="space-y-3">
+                        {selectedStatement.evaluation && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-500 mb-1">評価の根拠</p>
+                            <p className="text-sm text-gray-700">{selectedStatement.evaluation}</p>
+                          </div>
+                        )}
+                        {selectedStatement.feedback && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-500 mb-1">フィードバック</p>
+                            <p className="text-sm text-gray-700">{selectedStatement.feedback}</p>
+                          </div>
+                        )}
+                        {selectedStatement.suggestions && selectedStatement.suggestions.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-500 mb-1">改善提案</p>
+                            <ul className="text-sm text-gray-700 list-disc list-inside space-y-1">
+                              {selectedStatement.suggestions.map((suggestion: string, idx: number) => (
+                                <li key={idx}>{suggestion}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        {selectedStatement.score && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-500 mb-1">スコア</p>
+                            <p className="text-sm text-gray-700">{selectedStatement.score}/5</p>
+                          </div>
+                        )}
+                        {!selectedStatement.evaluation && !selectedStatement.feedback && (
+                          <p className="text-sm text-gray-500">評価が見つかりません</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -276,7 +306,24 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
                     </div>
                     <div className="bg-gray-50 p-3 rounded-lg">
                       <div className="text-sm text-gray-700 prose prose-sm max-w-none">
-                        <ReactMarkdown>{chat.aiResponse}</ReactMarkdown>
+                        <ReactMarkdown
+                          components={{
+                            p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                            ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>,
+                            ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>,
+                            li: ({ children }) => <li className="text-sm">{children}</li>,
+                            h1: ({ children }) => <h1 className="text-base font-semibold mb-2">{children}</h1>,
+                            h2: ({ children }) => <h2 className="text-sm font-semibold mb-2">{children}</h2>,
+                            h3: ({ children }) => <h3 className="text-sm font-medium mb-1">{children}</h3>,
+                            strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                            em: ({ children }) => <em className="italic">{children}</em>,
+                            code: ({ children }) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
+                            pre: ({ children }) => <pre className="bg-gray-100 p-2 rounded text-xs font-mono overflow-x-auto mb-2">{children}</pre>,
+                            blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-300 pl-2 italic mb-2">{children}</blockquote>
+                          }}
+                        >
+                          {chat.aiResponse}
+                        </ReactMarkdown>
                       </div>
                     </div>
                   </div>

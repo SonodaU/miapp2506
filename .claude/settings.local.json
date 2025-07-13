@@ -7,7 +7,8 @@
       "Bash(npm uninstall:*)",
       "Bash(find:*)",
       "Bash(ls:*)",
-      "Bash(npm update:*)"
+      "Bash(npm update:*)",
+      "Bash(touch:*)"
     ],
     "deny": []
   }

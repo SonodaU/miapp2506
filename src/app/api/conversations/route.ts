@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { config } from '@/lib/config'
 import { handleApiError, AppError } from '@/lib/error-handler'
+import { sendAnalysisCompleteEmail } from '@/lib/email'
 import { z } from 'zod'
 import type { AnalysisResult, AnalysisApiResponse } from '@/types/analysis'
 
@@ -57,6 +58,55 @@ async function analyzeConversation(text: string, targetBehavior?: string, apiKey
   }
 }
 
+// 非同期で分析を処理する関数
+async function processAnalysisAsync(
+  conversationId: string,
+  text: string,
+  targetBehavior: string | undefined,
+  apiKey: string,
+  userEmail: string
+) {
+  try {
+    // ステータスを処理中に更新
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { status: 'processing' }
+    })
+
+    // 分析を実行
+    const analysis = await analyzeConversation(text, targetBehavior, apiKey)
+
+    // 分析結果を保存
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: {
+        analysis: analysis as any,
+        status: 'completed'
+      }
+    })
+
+    // メール通知を送信
+    const analysisUrl = `${process.env.NEXTAUTH_URL}/analysis/${conversationId}`
+    await sendAnalysisCompleteEmail(userEmail, conversationId, analysisUrl)
+
+    // メール送信済みフラグを更新
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { emailNotified: true }
+    })
+
+    console.log(`Analysis completed and email sent for conversation ${conversationId}`)
+  } catch (error) {
+    console.error(`Error processing analysis for conversation ${conversationId}:`, error)
+    
+    // エラーステータスに更新
+    await prisma.conversation.update({
+      where: { id: conversationId },
+      data: { status: 'failed' }
+    })
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -100,21 +150,21 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { text, targetBehavior } = conversationSchema.parse(body)
 
-    // ユーザーのAPIキーを取得（フィールドが存在しない場合でも安全に処理）
-    let userApiKey = null
-    try {
-      const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { openaiApiKey: true }
-      })
-      userApiKey = user?.openaiApiKey
-    } catch (error) {
-      // openaiApiKeyフィールドが存在しない場合は無視
-      console.log('openaiApiKey field not found, using default API key')
+    // ユーザー情報を取得
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { 
+        openaiApiKey: true,
+        email: true
+      }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     // ユーザーのAPIキーまたはデフォルトのAPIキーを使用
-    const apiKey = userApiKey || process.env.OPENAI_API_KEY
+    const apiKey = user.openaiApiKey || process.env.OPENAI_API_KEY
 
     if (!apiKey) {
       return NextResponse.json({ 
@@ -122,32 +172,67 @@ export async function POST(request: NextRequest) {
       }, { status: 500 })
     }
 
-    // 会話を分析
-    const analysis = await analyzeConversation(text, targetBehavior, apiKey)
+    const textLength = text.trim().length
+    const isLongText = textLength > 2000
 
-    // データベースに保存
-    const conversation = await prisma.conversation.create({
-      data: {
-        userId: session.user.id,
-        text,
-        targetBehavior,
-        analysis: analysis as any,
-      },
-      select: {
-        id: true,
-        text: true,
-        createdAt: true,
-        analysis: true,
-      }
-    })
+    if (isLongText) {
+      // 長いテキストの場合は非同期処理
+      const conversation = await prisma.conversation.create({
+        data: {
+          userId: session.user.id,
+          text,
+          targetBehavior,
+          analysis: {},
+          status: 'pending',
+          emailNotified: false,
+        },
+        select: {
+          id: true,
+          text: true,
+          createdAt: true,
+          analysis: true,
+          status: true,
+        }
+      })
 
-    return NextResponse.json(
-      {
-        ...conversation,
-        createdAt: conversation.createdAt.toISOString(),
-      },
-      { status: 201 }
-    )
+      // バックグラウンドで分析を実行
+      processAnalysisAsync(conversation.id, text, targetBehavior, apiKey, user.email)
+
+      return NextResponse.json(
+        {
+          ...conversation,
+          createdAt: conversation.createdAt.toISOString(),
+        },
+        { status: 202 } // Accepted
+      )
+    } else {
+      // 短いテキストの場合は通常の同期処理
+      const analysis = await analyzeConversation(text, targetBehavior, apiKey)
+
+      const conversation = await prisma.conversation.create({
+        data: {
+          userId: session.user.id,
+          text,
+          targetBehavior,
+          analysis: analysis as any,
+          status: 'completed',
+        },
+        select: {
+          id: true,
+          text: true,
+          createdAt: true,
+          analysis: true,
+        }
+      })
+
+      return NextResponse.json(
+        {
+          ...conversation,
+          createdAt: conversation.createdAt.toISOString(),
+        },
+        { status: 201 }
+      )
+    }
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

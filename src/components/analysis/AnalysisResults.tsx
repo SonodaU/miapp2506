@@ -97,9 +97,28 @@ export const AnalysisResults = ({
                                 {statementData.statement}
                               </p>
                               {hasEvaluation && (
-                                <p className="text-sm text-gray-600">
-                                  {evaluation.evaluation || evaluation.feedback || '評価が見つかりません'}
-                                </p>
+                                <div className="space-y-2">
+                                 
+                                  {evaluation.feedback && (
+                                    <div>
+                                      <p className="text-xs font-medium text-gray-500 mb-1">フィードバック</p>
+                                      <p className="text-sm text-gray-700" dangerouslySetInnerHTML={{__html: evaluation.feedback.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}}></p>
+                                    </div>
+                                  )}
+                                  {evaluation.suggestions && evaluation.suggestions.length > 0 && (
+                                    <div>
+                                      <p className="text-xs font-medium text-gray-500 mb-1">改善提案</p>
+                                      <ul className="text-sm text-gray-700 list-disc list-inside space-y-1">
+                                        {evaluation.suggestions.map((suggestion: string, idx: number) => (
+                                          <li key={idx} dangerouslySetInnerHTML={{__html: suggestion.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}}></li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  {!evaluation.evaluation && !evaluation.feedback && (
+                                    <p className="text-sm text-gray-500">評価が見つかりません</p>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>

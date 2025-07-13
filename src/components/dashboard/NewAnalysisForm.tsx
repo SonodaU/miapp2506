@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
-import { MessageSquareIcon, Send, Loader2, Target, Crosshair, CrossIcon } from 'lucide-react'
+import { MessageSquareIcon, Send, Loader2, Target, Crosshair, CrossIcon, Clock, Mail } from 'lucide-react'
 
 interface NewAnalysisFormProps {
   onAnalyze: (text: string, targetBehavior: string) => Promise<void>
@@ -15,6 +15,7 @@ interface NewAnalysisFormProps {
 export const NewAnalysisForm = ({ onAnalyze, isLoading }: NewAnalysisFormProps) => {
   const [text, setText] = useState('')
   const [targetBehavior, setTargetBehavior] = useState('')
+  const [progress, setProgress] = useState(0)
 
   const handleSubmit = async () => {
     if (!text.trim()) return
@@ -22,6 +23,40 @@ export const NewAnalysisForm = ({ onAnalyze, isLoading }: NewAnalysisFormProps) 
     setText('')
     setTargetBehavior('')
   }
+
+  const getLoadingMessage = () => {
+    const textLength = text.trim().length
+    if (textLength > 2000) {
+      return '解析には時間を要するため、完了後にメールでお知らせします...'
+    }
+    return '返信まで1分程度かかることがあります...'
+  }
+
+  // プログレスバーのアニメーション
+  useEffect(() => {
+    if (isLoading) {
+      setProgress(0)
+      const duration = 60000 // 60秒
+      const targetProgress = 90 // 90%
+      const interval = 100 // 100ms間隔で更新
+      const increment = (targetProgress / duration) * interval
+
+      const timer = setInterval(() => {
+        setProgress(prev => {
+          const newProgress = prev + increment
+          if (newProgress >= targetProgress) {
+            clearInterval(timer)
+            return targetProgress
+          }
+          return newProgress
+        })
+      }, interval)
+
+      return () => clearInterval(timer)
+    } else {
+      setProgress(0)
+    }
+  }, [isLoading])
 
   const handleSampleText = () => {
     const sampleText = `セラピスト（T）：このところはどんな具合ですか。
@@ -109,6 +144,26 @@ T：ええ。たとえば「玄関を出たらOK」「3分歩けたらOK」と�
             )}
           </div>
         </div>
+        
+        {/* ローディング状態の表示 */}
+        {isLoading && (
+          <div className="flex flex-col items-center space-y-3 py-4">
+            <div className="flex items-center space-x-2">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              <span className="text-sm text-gray-600">{getLoadingMessage()}</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out" 
+                style={{ width: `${progress}%` }}
+              ></div>
+            </div>
+            {/* <div className="text-xs text-gray-500">
+              {Math.round(progress)}% 完了
+            </div> */}
+          </div>
+        )}
+        
         <div className="flex justify-center">
           <button
             onClick={handleSubmit}

@@ -78,12 +78,42 @@ export const DetailDialog = ({
                 <div className="flex items-start space-x-3">
                   {getEvaluationIcon(selectedStatement.icon || 'good')}
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900 mb-2">
+                    <p className="text-sm font-medium text-gray-900 mb-3">
                       {selectedStatement.statement || selectedStatement.content || '発言内容が見つかりません'}
                     </p>
-                    <p className="text-sm text-gray-600">
-                      {selectedStatement.evaluation || selectedStatement.feedback || '評価が見つかりません'}
-                    </p>
+                    <div className="space-y-3">
+                      {selectedStatement.evaluation && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-1">評価の根拠</p>
+                          <p className="text-sm text-gray-700" dangerouslySetInnerHTML={{__html: selectedStatement.evaluation.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}}></p>
+                        </div>
+                      )}
+                      {selectedStatement.feedback && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-1">フィードバック</p>
+                          <p className="text-sm text-gray-700" dangerouslySetInnerHTML={{__html: selectedStatement.feedback.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}}></p>
+                        </div>
+                      )}
+                      {selectedStatement.suggestions && selectedStatement.suggestions.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-1">改善提案</p>
+                          <ul className="text-sm text-gray-700 list-disc list-inside space-y-1">
+                            {selectedStatement.suggestions.map((suggestion: string, idx: number) => (
+                              <li key={idx} dangerouslySetInnerHTML={{__html: suggestion.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}}></li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                      {selectedStatement.score && (
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 mb-1">スコア</p>
+                          <p className="text-sm text-gray-700">{selectedStatement.score}/5</p>
+                        </div>
+                      )}
+                      {!selectedStatement.evaluation && !selectedStatement.feedback && (
+                        <p className="text-sm text-gray-500">評価が見つかりません</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

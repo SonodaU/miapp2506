@@ -171,6 +171,10 @@ async function generateAIResponse(
   ])
 
   try {
+    // タイムアウト設定付きでfetch実行
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), config.pythonApi.timeout)
+    
     // 新しいdetailed-chatエンドポイントを使用してプロンプト管理を一元化
     const response = await fetch(`${config.pythonApi.url}/detailed-chat`, {
       method: 'POST',
@@ -186,7 +190,10 @@ async function generateAIResponse(
         use_reference: useReference,
         api_key: apiKey,
       }),
+      signal: controller.signal,
     })
+    
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
       throw new Error(`FastAPI detailed-chat request failed: ${response.status}`)

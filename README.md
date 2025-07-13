@@ -86,6 +86,14 @@ OPENAI_API_KEY="your-openai-api-key-here"
 
 # Python API
 PYTHON_API_URL="http://localhost:8000"
+PYTHON_API_TIMEOUT="120000"
+
+# メール通知設定（長いテキスト分析用）
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-app-password"
+SMTP_FROM="your-email@gmail.com"
 ```
 
 ### 5. データベースのセットアップ
@@ -394,3 +402,139 @@ npx prisma migrate status
    ```bash
    DATABASE_URL="supabase-url" npx prisma migrate deploy
    ```
+
+## メール通知設定
+
+### 概要
+
+システムでは2000字を超える長いテキストの分析時に、非同期処理とメール通知機能を提供しています：
+
+- **2000字以下**: 即座に分析結果を表示
+- **2000字超**: バックグラウンドで分析実行後、メールで完了通知
+
+### SMTP設定の詳細
+
+#### 各設定項目の説明
+
+| 項目 | 説明 | 例 |
+|------|------|-----|
+| `SMTP_HOST` | SMTPサーバーのホスト名 | `smtp.gmail.com` |
+| `SMTP_PORT` | SMTPサーバーのポート番号 | `587` (TLS推奨) |
+| `SMTP_USER` | 送信用メールアドレス | `your-app@gmail.com` |
+| `SMTP_PASS` | **アプリパスワード**（通常パスワード不可） | `abcd efgh ijkl mnop` |
+| `SMTP_FROM` | 送信者として表示されるアドレス | `your-app@gmail.com` |
+
+#### 主要プロバイダー設定
+
+**Gmail**
+```env
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USER="your-gmail@gmail.com"
+SMTP_PASS="your-16-character-app-password"
+SMTP_FROM="your-gmail@gmail.com"
+```
+
+**Outlook/Hotmail**
+```env
+SMTP_HOST="smtp.live.com"
+SMTP_PORT="587"
+SMTP_USER="your-email@outlook.com"
+SMTP_PASS="your-app-password"
+SMTP_FROM="your-email@outlook.com"
+```
+
+**SendGrid（商用推奨）**
+```env
+SMTP_HOST="smtp.sendgrid.net"
+SMTP_PORT="587"
+SMTP_USER="apikey"
+SMTP_PASS="your-sendgrid-api-key"
+SMTP_FROM="noreply@yourdomain.com"
+```
+
+### Gmail設定手順
+
+#### Step 1: Googleアカウントでアプリパスワードを生成
+
+1. **Google アカウントにログイン**
+   - [myaccount.google.com](https://myaccount.google.com) にアクセス
+
+2. **セキュリティ設定**
+   - 左メニューの「セキュリティ」をクリック
+
+3. **2段階認証を有効化**（まだの場合）
+   - 「Googleへのログイン」セクション
+   - 「2段階認証プロセス」を有効にする
+
+4. **アプリパスワードを生成**
+   - 「Googleへのログイン」セクション
+   - 「アプリパスワード」をクリック
+   - アプリ名: `Conversation Analyzer`
+   - 生成された16文字のパスワードをコピー
+
+#### Step 2: 環境変数の設定
+
+```env
+# Gmail設定例
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT="587"
+SMTP_USER="your-gmail-address@gmail.com"
+SMTP_PASS="abcd efgh ijkl mnop"  # ←生成されたアプリパスワード
+SMTP_FROM="your-gmail-address@gmail.com"
+```
+
+### セキュリティ注意事項
+
+⚠️ **重要な注意点**
+
+- **通常のパスワードは使用禁止** - 必ずアプリパスワードを使用
+- **環境変数は`.env`ファイルに記載** - Gitにコミットしない
+- **Gmail制限**: 1日500通、1時間100通
+- **商用利用**: SendGridなどの専用サービス推奨
+
+### メール通知のテスト
+
+メール設定後、以下でテストできます：
+
+```bash
+# 開発環境でテスト（2000字超のテキストで分析実行）
+# システムが自動的にメール通知を送信
+```
+
+### メール通知の流れ
+
+1. **長いテキスト（2000字超）投稿時**:
+   ```
+   POST /api/conversations
+   ↓
+   ポップアップ表示「時間を要します。終了したらメールでお知らせします」
+   ↓
+   DB保存（status: pending）
+   ↓
+   HTTP 202 Accepted 返却
+   ↓
+   バックグラウンドで分析実行
+   ↓
+   分析完了後メール送信
+   ```
+
+2. **送信されるメール内容**:
+   - 件名: 「会話分析が完了しました」
+   - 内容: 分析結果ページへのリンク付きHTML
+
+### トラブルシューティング
+
+**メール送信エラー**
+```
+Error: Invalid login
+```
+- アプリパスワードが正しく設定されているか確認
+- 2段階認証が有効になっているか確認
+
+**認証エラー**
+```
+Error: Username and Password not accepted
+```
+- `SMTP_USER`と`SMTP_PASS`の値を再確認
+- Gmail以外の場合、そのプロバイダーの設定を確認
