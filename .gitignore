@@ -152,6 +152,9 @@ wheels/
 .installed.cfg
 *.egg
 
+# Allow src/lib/ directory (Next.js project structure)
+!src/lib/
+
 # Database
 *.db
 *.sqlite
