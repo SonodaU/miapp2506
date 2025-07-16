@@ -12,6 +12,7 @@ const chatSchema = z.object({
   question: z.string().min(1).max(1000),
   useReference: z.boolean().optional().default(false),
   statementIndex: z.number().int().min(0),
+  statementContent: z.string().optional().default(''),
 })
 
 export async function GET(
@@ -75,7 +76,10 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { aspect, question, useReference, statementIndex } = chatSchema.parse(body)
+    console.log('Chat API - Request body:', JSON.stringify(body, null, 2))
+    
+    const { aspect, question, useReference, statementIndex, statementContent } = chatSchema.parse(body)
+    console.log('Chat API - Parsed data:', { aspect, question, useReference, statementIndex, statementContent })
 
     // 会話が存在し、ユーザーが所有者であることを確認
     const conversation = await prisma.conversation.findFirst({
@@ -99,7 +103,7 @@ export async function POST(
 
     if (!apiKey) {
       return NextResponse.json({ 
-        error: 'OpenAI APIキーが設定されていません。管理者にお問い合わせください。' 
+        error: 'OpenAI APIキーが設定されていません。ダッシュボードでAPIキーを設定するか、管理者にお問い合わせください。' 
       }, { status: 500 })
     }
 
@@ -115,14 +119,18 @@ export async function POST(
     })
 
     // AIレスポンスを生成
+    console.log('Chat API - Generating AI response for statement:', statementContent)
     const aiResponse = await generateAIResponse(
       conversation,
       aspect as EvaluationAxis,
       question,
       existingChats,
       useReference,
-      apiKey
+      apiKey,
+      statementIndex,
+      statementContent
     )
+    console.log('Chat API - AI response generated successfully')
 
     // チャットを保存
     const chat = await prisma.chat.create({
@@ -141,7 +149,10 @@ export async function POST(
       createdAt: chat.createdAt.toISOString(),
     }, { status: 201 })
   } catch (error) {
+    console.error('Chat API - Error occurred:', error)
+    
     if (error instanceof z.ZodError) {
+      console.error('Chat API - Validation error:', error.errors)
       return NextResponse.json(
         { error: 'Invalid input', details: error.errors },
         { status: 400 }
@@ -149,6 +160,7 @@ export async function POST(
     }
 
     const errorDetails = handleApiError(error)
+    console.error('Chat API - Handled error:', errorDetails)
     return NextResponse.json(
       { error: errorDetails.message },
       { status: errorDetails.status || 500 }
@@ -162,7 +174,9 @@ async function generateAIResponse(
   userQuestion: string,
   existingChats: any[],
   useReference: boolean,
-  apiKey?: string
+  apiKey?: string,
+  statementIndex?: number,
+  statementContent?: string
 ): Promise<string> {
   // チャット履歴を適切な形式に変換
   const chatHistory = existingChats.flatMap(chat => [
@@ -171,6 +185,24 @@ async function generateAIResponse(
   ])
 
   try {
+    // Python APIに送信するデータを構築
+    const requestPayload = {
+      conversation_text: conversation.text,
+      analysis_result: conversation.analysis,
+      aspect,
+      user_question: userQuestion,
+      chat_history: chatHistory,
+      use_reference: useReference,
+      api_key: apiKey,
+      statement_index: statementIndex,
+      statement_content: statementContent,
+    };
+    
+    console.log('generateAIResponse - Sending to Python API:', {
+      url: `${config.pythonApi.url}/detailed-chat`,
+      payload: JSON.stringify(requestPayload, null, 2)
+    });
+
     // タイムアウト設定付きでfetch実行
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), config.pythonApi.timeout)
@@ -181,28 +213,27 @@ async function generateAIResponse(
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        conversation_text: conversation.text,
-        analysis_result: conversation.analysis,
-        aspect,
-        user_question: userQuestion,
-        chat_history: chatHistory,
-        use_reference: useReference,
-        api_key: apiKey,
-      }),
+      body: JSON.stringify(requestPayload),
       signal: controller.signal,
     })
     
     clearTimeout(timeoutId)
 
     if (!response.ok) {
-      throw new Error(`FastAPI detailed-chat request failed: ${response.status}`)
+      const errorText = await response.text().catch(() => 'Unknown error')
+      console.error('Python API error response:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
+      })
+      throw new Error(`FastAPI detailed-chat request failed: ${response.status} - ${errorText}`)
     }
 
     const data = await response.json()
+    console.log('generateAIResponse - Python API response:', data)
     return data.response || 'エラーが発生しました。もう一度お試しください。'
   } catch (error) {
-    console.error('Error generating AI response:', error)
+    console.error('generateAIResponse - Error occurred:', error)
     throw error
   }
 }

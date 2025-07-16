@@ -44,10 +44,12 @@ class AnalysisService:
         api_key: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """特定の評価軸で分析"""
-        prompt = PromptManager.get_analysis_prompt(text, aspect, target_behavior)
+        system, prompt = PromptManager.get_analysis_prompt(text, aspect, target_behavior)
         
         response = await openai_service.create_chat_completion(
-            messages=[{"role": "user", "content": prompt}],
+            messages=[
+                {"role": "developer", "content": system},
+                {"role": "user", "content": prompt}],
             api_key=api_key
         )
         

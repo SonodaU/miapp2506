@@ -128,25 +128,51 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
 
   const sendQuestion = async (questionText: string, useRef: boolean) => {
     if (!questionText.trim() || !selectedAspect) {
+      console.log('sendQuestion: Missing question or aspect', { questionText, selectedAspect })
       return
     }
 
+    console.log('sendQuestion: Starting request', {
+      questionText,
+      useRef,
+      selectedAspect,
+      selectedStatementIndex,
+      selectedStatement
+    })
+
     setIsLoading(true)
     try {
+      const statementContent = selectedStatement?.statement || selectedStatement?.content || ''
+      console.log('sendQuestion: Statement content:', statementContent)
+      
       const newChat = await apiClient.sendChatMessage(
         params.id,
         selectedAspect,
         questionText,
         selectedStatementIndex,
-        useRef
+        useRef,
+        statementContent
       )
+      
+      console.log('sendQuestion: Success', newChat)
       
       setCurrentChats([...currentChats, newChat])
       setAllChats([...allChats, newChat])
     } catch (error) {
       const errorDetails = handleApiError(error)
       setError(errorDetails.message)
-      console.error('Error sending question:', error)
+      console.error('sendQuestion: Error occurred', {
+        error,
+        errorDetails,
+        requestData: {
+          conversationId: params.id,
+          aspect: selectedAspect,
+          question: questionText,
+          statementIndex: selectedStatementIndex,
+          useReference: useRef,
+          statementContent: selectedStatement?.statement || selectedStatement?.content || ''
+        }
+      })
     } finally {
       setIsLoading(false)
     }

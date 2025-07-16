@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     debug: bool = False
     
     # OpenAI API設定
-    openai_model: str = "gpt-4.1"
+    openai_model: str = "gpt-4.1" # 変更してはいけない
     openai_temperature: float = 0.3
     openai_max_tokens: int = 8000
     openai_timeout: int = 120  # タイムアウト（秒）

@@ -13,17 +13,49 @@ class ChatService:
     
     async def detailed_chat(self, request: DetailedChatRequest) -> str:
         """詳細分析チャット"""
-        system_prompt = PromptManager.get_detailed_chat_system_prompt(
-            request.aspect, 
-            request.use_reference
+        system,prompt = PromptManager.get_detailed_chat_prompt(
+            text=request.conversation_text,
+            aspect=request.aspect, 
+            use_reference=request.use_reference,
         )
         
+        # 分析結果から該当する発言の評価を取得
+        # statement_contentを使って正しい評価を見つける
+        statement_evaluation = None
+        aspect_evaluations = request.analysis_result.get(request.aspect, [])
+        
+        # statement_contentが提供されている場合、それにマッチする評価を探す
+        if request.statement_content:
+            for evaluation in aspect_evaluations:
+                eval_statement = evaluation.get('statement', '') or evaluation.get('content', '')
+                # 発言の一部がマッチするかチェック（前方50文字で比較）
+                if eval_statement and request.statement_content[:50] in eval_statement:
+                    statement_evaluation = evaluation
+                    break
+        
+        # マッチしない場合はstatement_indexを使用（フォールバック）
+        if not statement_evaluation and request.statement_index < len(aspect_evaluations):
+            statement_evaluation = aspect_evaluations[request.statement_index]
+        
+        # 評価が見つからない場合はエラーを返す
+        if not statement_evaluation:
+            raise ValueError(f"指定された発言の評価が見つかりません。発言内容: {request.statement_content[:50] if request.statement_content else 'なし'}...")
+        
+        # 評価結果を文字列として整理
+        reply_content = f"""発言: {statement_evaluation.get('statement', request.statement_content or '')}
+
+評価の根拠: {statement_evaluation.get('evaluation', '')}
+
+フィードバック: {statement_evaluation.get('feedback', '')}
+
+改善提案: {', '.join(statement_evaluation.get('suggestions', []))}
+
+このフィードバックに関して質問はありますか。"""
+
         messages = [
-            {"role": "developer", "content": system_prompt},
-            {
-                "role": "user", 
-                "content": f"分析対象の会話:\n{request.conversation_text}\n\n分析結果:\n{json.dumps(request.analysis_result, ensure_ascii=False, indent=2)}"
-            }
+            {"role": "developer", "content": system},
+            {"role": "user", "content": prompt},
+            {"role": "assistant", "content": reply_content}
         ]
         
         # チャット履歴を追加

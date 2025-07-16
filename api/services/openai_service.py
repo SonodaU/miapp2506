@@ -35,14 +35,14 @@ class OpenAIService:
     ) -> str:
         """チャット補完を実行"""
         client = self._get_client(api_key)
-        response = await client.responses.create(
+        response = await client.chat.completions.create(
             model=model or settings.openai_model,
-            input=messages,
-            # temperature=temperature or settings.openai_temperature,
-            max_output_tokens=max_tokens or settings.openai_max_tokens
+            messages=messages,
+            temperature=temperature or settings.openai_temperature,
+            max_tokens=max_tokens or settings.openai_max_tokens
         )
         
-        return response.output_text or "エラーが発生しました。もう一度お試しください。"
+        return response.choices[0].message.content or "エラーが発生しました。もう一度お試しください。"
 
 
 # グローバルインスタンス

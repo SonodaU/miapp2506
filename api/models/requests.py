@@ -22,5 +22,7 @@ class DetailedChatRequest(BaseModel):
     chat_history: List[Dict[str, str]] = []
     use_reference: bool = False
     api_key: Optional[str] = None
+    statement_index: int = 0
+    statement_content: Optional[str] = None
 
 

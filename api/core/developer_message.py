@@ -1,6 +1,7 @@
 """
 開発者メッセージ管理
 """
+from typing import Optional
 
 
 class DeveloperMessageConfig:
@@ -60,20 +61,11 @@ MIのスピリットを実現するのに用いる具体的なスキル。
     """
     
     @staticmethod
-    def get_base_system_message() -> str:
-        """基本的なシステムメッセージを取得"""
-        return DeveloperMessageConfig.COMMON_DEVELOPER_MESSAGE.strip()
+    def get_system_message(analysys: Optional[bool]=False) -> str:
+        """システムプロンプトを取得"""
+        a = DeveloperMessageConfig.COMMON_DEVELOPER_MESSAGE
+        if analysys:
+            a += "\n\n" + DeveloperMessageConfig.ANALYSIS_SPECIFIC_MESSAGE
+        return a
     
-    @staticmethod
-    def get_analysis_system_message() -> str:
-        """分析用システムメッセージを取得"""
-        return f"{DeveloperMessageConfig.get_base_system_message()}\n\n{DeveloperMessageConfig.ANALYSIS_SPECIFIC_MESSAGE.strip()}"
-    
-    @staticmethod
-    def get_enhanced_system_message(additional_context: str = "") -> str:
-        """追加コンテキストを含むシステムメッセージを取得"""
-        base_message = DeveloperMessageConfig.get_base_system_message()
-        if additional_context:
-            return f"{base_message}\n\n{additional_context}"
-        return base_message
     

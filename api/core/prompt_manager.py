@@ -28,7 +28,7 @@ class PromptManager:
 - クライエントを明確に専門家や意思決定者として認識する
 - クライエントが持っている情報に応じてどうアドバイスするか変える
 - 臨床家が専門家の役割をしない。""",
-            "empathy": """共感性の評価。クライエントの観点や経験を把握しようと努力しているか評価する。以下の例で高い評価になります。
+            "empathy": """共感性の評価。クライエントの観点や経験を**把握しようと努力しているか**評価する。以下の例で高い評価になります。
 - クライエントの観点、価値観、人生観について、興味を持って理解していると，クライエントに示す。例えば「複雑な聞き返し」を使って，まだ言っていないことを言ってみせる。
 - クライエントの価値観や見解に興味をもって，深掘りする"""
         }
@@ -37,9 +37,8 @@ class PromptManager:
     @staticmethod
     def get_analysis_prompt(text: str, aspect: EvaluationAxis, target_behavior: Optional[str] = None) -> str:
         """分析用プロンプトを生成"""
-        developer_message = DeveloperMessageConfig.get_analysis_system_message()
-        base_prompt = f"""{developer_message}
-
+        developer_message = DeveloperMessageConfig.get_system_message(analysys=True)
+        base_prompt = f"""
 # 指示
 対話文を与えるので，以下の評価軸で分析してください。
 臨床家（治療を行う者）の発言から重要なものを抽出し評価してください。
@@ -63,17 +62,26 @@ class PromptManager:
 # 対話文
 {text}
 """
-        return base_prompt
+        return developer_message,base_prompt
     
     @staticmethod
-    def get_detailed_chat_system_prompt(aspect: EvaluationAxis, use_reference: bool) -> str:
-        """詳細チャット用システムプロンプトを生成"""
-        additional_context = f"あなたは会話分析の専門家です。特に{PromptManager.get_aspect_description(aspect)}に関する質問に答えてください。"
+    def get_detailed_chat_prompt(text: str, aspect: EvaluationAxis, use_reference: bool,target_behavior: Optional[str] = None) -> str:
+        """詳細チャット用"""
+        developer_message = DeveloperMessageConfig.get_system_message()
+        base_prompt = f"""
+        # 指示
+        対話文を与えるので，以下の評価軸で分析してください。
+        臨床家（治療を行う者）の発言から重要なものを抽出し評価してください。
+        # 評価軸
+        {PromptManager.get_aspect_description(aspect)}
+        # 対話文
+        {text}
+        """
         
         if use_reference:
-            additional_context += """
+            base_prompt += """
 
 学術的な根拠や参考文献を含めて回答してください。心理学、カウンセリング、コミュニケーション理論の観点から専門的な説明を行ってください。
 可能な限り具体的な研究結果や理論名を挙げて説明してください。"""
         
-        return DeveloperMessageConfig.get_enhanced_system_message(additional_context)
+        return developer_message,base_prompt.strip()
