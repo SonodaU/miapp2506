@@ -21,6 +21,8 @@ interface DetailDialogProps {
   onSendQuestion: (question: string, useReference: boolean) => Promise<void>
   isLoading: boolean
   suggestedQuestions: string[]
+  conversationId: string
+  onAddChat: (newChat: Chat) => void
 }
 
 export const DetailDialog = ({
@@ -32,6 +34,8 @@ export const DetailDialog = ({
   onSendQuestion,
   isLoading,
   suggestedQuestions,
+  conversationId,
+  onAddChat,
 }: DetailDialogProps) => {
   const [question, setQuestion] = useState('')
   const [useReference, setUseReference] = useState(false)
