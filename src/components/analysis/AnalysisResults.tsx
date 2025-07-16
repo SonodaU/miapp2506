@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs'
 import { Info } from 'lucide-react'
-import { getEvaluationIcon } from '@/components/ui/icons'
+import { getEvaluationIcon } from '../ui/icons'
 import { getAspectShortTitle } from '../../lib/utils/evaluation'
-import type { AnalysisResult, EvaluationAxis } from '@/types/analysis'
+import type { AnalysisResult, EvaluationAxis } from '../../types/analysis'
 
 interface AnalysisResultsProps {
   analysis: AnalysisResult
