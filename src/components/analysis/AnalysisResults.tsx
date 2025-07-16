@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Info } from 'lucide-react'
 import { getEvaluationIcon } from '@/components/ui/icons'
-import { getAspectShortTitle } from '@/lib/utils/evaluation'
+import { getAspectShortTitle } from '../../lib/utils/evaluation'
 import type { AnalysisResult, EvaluationAxis } from '@/types/analysis'
 
 interface AnalysisResultsProps {

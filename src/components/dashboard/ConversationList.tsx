@@ -2,7 +2,7 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { History } from 'lucide-react'
-import { formatDate } from '@/lib/utils/date'
+import { formatDate } from '../../lib/utils/date'
 import type { Conversation } from '@/types/analysis'
 
 interface ConversationListProps {
