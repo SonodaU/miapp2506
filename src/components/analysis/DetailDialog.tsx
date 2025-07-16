@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator'
 import { Send, TextSearch, Loader2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { getEvaluationIcon } from '@/components/ui/icons'
-import { getAspectTitle } from '../../lib/utils/evaluation'
+import { getAspectTitle } from '@/lib/utils/evaluation'
 import type { Chat, EvaluationAxis } from '@/types/analysis'
 
 interface DetailDialogProps {
