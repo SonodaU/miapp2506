@@ -48,13 +48,13 @@ class PromptManager:
             {target_behavior}
 　これは、クライエントが変化を望む行動や目標です。この目標に動機づけされるよう評価しなさい。
 # 出力形式
-重要な発言を最大5つ抽出し、以下のJSON形式で返してください：
+重要な発言を最大3つ抽出し、以下のJSON形式で返してください：
 [
   {{
     "statement": "発言（意味のない発言は無視すること）",
     "evaluation": "評価の根拠（内部処理用でユーザには見せない）",
     "score": 1-5の評価点,
-    "feedback": "具体的なフィードバック（ユーザに見せる）",
+    "feedback": "具体的なフィードバック（ユーザに見せる）。重要な部分は「**」で囲め。",
     "suggestions": ["改善提案1", "改善提案2(optional)"]フィードバックを踏まえた，よりよい発言の具体例。もしあれば補足説明。
     "icon": "good/warning/bad"
   }}
@@ -78,10 +78,8 @@ class PromptManager:
         {text}
         """
         
-        if use_reference:
-            base_prompt += """
-
-学術的な根拠や参考文献を含めて回答してください。心理学、カウンセリング、コミュニケーション理論の観点から専門的な説明を行ってください。
-可能な限り具体的な研究結果や理論名を挙げて説明してください。"""
+        # if use_reference:
+        #     base_prompt += """# ツール使用
+        #     参考文献を検索しつつ返答してください"""
         
         return developer_message,base_prompt.strip()

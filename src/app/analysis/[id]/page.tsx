@@ -427,6 +427,11 @@ export default function AnalysisPage({ params }: { params: { id: string } }) {
         onSendQuestion={sendQuestion}
         isLoading={isLoading}
         suggestedQuestions={suggestedQuestions}
+        conversationId={params.id}
+        onAddChat={(newChat) => {
+          setCurrentChats([...currentChats, newChat])
+          setAllChats([...allChats, newChat])
+        }}
       />
     </div>
   )

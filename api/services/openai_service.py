@@ -31,7 +31,8 @@ class OpenAIService:
         model: str = None,
         temperature: float = None,
         max_tokens: int = None,
-        api_key: str = None
+        api_key: str = None,
+        search: bool = False
     ) -> str:
         """チャット補完を実行"""
         client = self._get_client(api_key)
@@ -39,7 +40,7 @@ class OpenAIService:
             model=model or settings.openai_model,
             messages=messages,
             temperature=temperature or settings.openai_temperature,
-            max_tokens=max_tokens or settings.openai_max_tokens
+            max_tokens=max_tokens or settings.openai_max_tokens,
         )
         
         return response.choices[0].message.content or "エラーが発生しました。もう一度お試しください。"

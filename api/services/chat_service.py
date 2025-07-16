@@ -66,9 +66,9 @@ class ChatService:
         
         return await openai_service.create_chat_completion(
             messages=messages,
-            api_key=request.api_key
+            api_key=request.api_key,
+            search = request.use_reference
         )
-    
 
 
 # グローバルインスタンス

@@ -8,8 +8,17 @@
       "Bash(find:*)",
       "Bash(ls:*)",
       "Bash(npm update:*)",
-      "Bash(touch:*)"
+      "Bash(touch:*)",
+      "mcp__gemini-cli__chat",
+      "mcp__gemini-cli__googleSearch"
     ],
     "deny": []
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "playwright",
+    "markitdown",
+    "context7",
+    "gemini-cli"
+  ]
 }

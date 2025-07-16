@@ -104,12 +104,12 @@ export const DetailDialog = ({
                           </ul>
                         </div>
                       )}
-                      {selectedStatement.score && (
+                      {/* {selectedStatement.score && (
                         <div>
                           <p className="text-xs font-medium text-gray-500 mb-1">スコア</p>
                           <p className="text-sm text-gray-700">{selectedStatement.score}/5</p>
                         </div>
-                      )}
+                      )} */}
                       {!selectedStatement.evaluation && !selectedStatement.feedback && (
                         <p className="text-sm text-gray-500">評価が見つかりません</p>
                       )}
@@ -130,27 +130,30 @@ export const DetailDialog = ({
                     <div className="text-sm text-gray-700 prose prose-sm max-w-none">
                       <ReactMarkdown
                         components={{
-                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
-                          ul: ({ children }) => <ul className="list-disc pl-5 mb-2 space-y-1">{children}</ul>,
-                          ol: ({ children }) => <ol className="list-decimal pl-5 mb-2 space-y-1">{children}</ol>,
+                          p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
+                          ul: ({ children }) => <ul className="list-disc pl-5 mb-3 space-y-1">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal pl-5 mb-3 space-y-1">{children}</ol>,
                           li: ({ children }) => <li className="text-sm">{children}</li>,
-                          h1: ({ children }) => <h1 className="text-base font-semibold mb-2">{children}</h1>,
-                          h2: ({ children }) => <h2 className="text-sm font-semibold mb-2">{children}</h2>,
-                          h3: ({ children }) => <h3 className="text-sm font-medium mb-1">{children}</h3>,
+                          h1: ({ children }) => <h1 className="text-xl font-bold mb-4 mt-6 first:mt-0">{children}</h1>,
+                          h2: ({ children }) => <h2 className="text-lg font-bold mb-3 mt-5 first:mt-0">{children}</h2>,
+                          h3: ({ children }) => <h3 className="text-base font-semibold mb-2 mt-4 first:mt-0">{children}</h3>,
+                          h4: ({ children }) => <h4 className="text-sm font-semibold mb-2 mt-3 first:mt-0">{children}</h4>,
                           strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
                           em: ({ children }) => <em className="italic">{children}</em>,
                           code: ({ children }) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">{children}</code>,
-                          pre: ({ children }) => <pre className="bg-gray-100 p-2 rounded text-xs font-mono overflow-x-auto mb-2">{children}</pre>,
-                          blockquote: ({ children }) => <blockquote className="border-l-2 border-gray-300 pl-2 italic mb-2">{children}</blockquote>
+                          pre: ({ children }) => <pre className="bg-gray-100 p-3 rounded text-xs font-mono overflow-x-auto mb-3">{children}</pre>,
+                          blockquote: ({ children }) => <blockquote className="border-l-4 border-gray-300 pl-4 italic mb-3 py-1">{children}</blockquote>,
+                          hr: ({ children }) => <hr className="border-t border-gray-300 my-6" />
                         }}
                       >
                         {chat.aiResponse}
                       </ReactMarkdown>
                     </div>
                   </div>
-                  {index < currentChats.length - 1 && <Separator />}
+                  {index < currentChats.length - 1 && <Separator className="my-6" />}
                 </div>
               ))}
+              
             </div>
 
             {/* Question Input Area */}
@@ -178,6 +181,12 @@ export const DetailDialog = ({
                     placeholder="質問を入力してください..."
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                        e.preventDefault()
+                        handleSendQuestion()
+                      }
+                    }}
                     className="w-full pr-12"
                     rows={3}
                   />
