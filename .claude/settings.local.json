@@ -10,7 +10,9 @@
       "Bash(npm update:*)",
       "Bash(touch:*)",
       "mcp__gemini-cli__chat",
-      "mcp__gemini-cli__googleSearch"
+      "mcp__gemini-cli__googleSearch",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   },
