@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # CORS設定
     allowed_origins: List[str] = [
         "http://localhost:3000",
-        "https://your-vercel-domain.vercel.app"
+        os.getenv("FRONTEND_URL", "http://localhost:3000")
     ]
     
     # サーバー設定
