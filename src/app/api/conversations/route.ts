@@ -8,6 +8,9 @@ import { sendAnalysisCompleteEmail } from '@/lib/email'
 import { z } from 'zod'
 import type { AnalysisResult, AnalysisApiResponse } from '@/types/analysis'
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic'
+
 const conversationSchema = z.object({
   text: z.string().min(1).max(config.analysis.maxTextLength),
   targetBehavior: z.string().optional(),

@@ -7,6 +7,9 @@ import { handleApiError } from '@/lib/error-handler'
 import { z } from 'zod'
 import type { EvaluationAxis } from '@/types/analysis'
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic'
+
 const chatSchema = z.object({
   aspect: z.enum(['cct', 'sst', 'empathy', 'partnership']),
   question: z.string().min(1).max(1000),

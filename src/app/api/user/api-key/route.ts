@@ -5,6 +5,9 @@ import { prisma } from '@/lib/prisma'
 import { handleApiError } from '@/lib/error-handler'
 import { z } from 'zod'
 
+// Force dynamic rendering for this route
+export const dynamic = 'force-dynamic'
+
 const apiKeySchema = z.object({
   apiKey: z.string().min(1, "APIキーを入力してください").max(200, "APIキーが長すぎます"),
 })
