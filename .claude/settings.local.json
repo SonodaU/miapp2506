@@ -12,7 +12,9 @@
       "mcp__gemini-cli__chat",
       "mcp__gemini-cli__googleSearch",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)"
     ],
     "deny": []
   },

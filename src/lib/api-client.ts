@@ -96,6 +96,24 @@ export const apiClient = {
       body: JSON.stringify({ apiKey }),
     });
   },
+
+  async deleteApiKey(): Promise<void> {
+    return fetchApi<void>('/api/user/api-key', {
+      method: 'DELETE',
+    });
+  },
+
+  // ユーザープロファイル管理
+  async getUserProfile(): Promise<{ id: string; email: string; name: string | null; createdAt: string; updatedAt: string }> {
+    return fetchApi<{ id: string; email: string; name: string | null; createdAt: string; updatedAt: string }>('/api/user/profile');
+  },
+
+  async updateUserProfile(name: string): Promise<void> {
+    return fetchApi<void>('/api/user/profile', {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    });
+  },
 };
 
 export { ApiError };
