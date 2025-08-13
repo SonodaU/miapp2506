@@ -2,25 +2,53 @@ name: Migrate DB (prod) and Deploy
 
 on:
   push:
-    branches: [ "main" ]
-  workflow_dispatch:
+    branches: [ "main" ]             # main に push/merge で自動実行
+    paths:
+      - "prisma/**"
+      - "package.json"
+      - "package-lock.json"
+      - "yarn.lock"
+  workflow_dispatch:                  # 手動実行も可
+
+concurrency:
+  group: migrate-prod
+  cancel-in-progress: false           # 並走させない（安全）
 
 jobs:
   migrate:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    environment: production           # （任意）環境保護を使うなら
 
-      - uses: actions/setup-node@v4
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: "20"
 
-      - run: npm ci
-      - run: npx prisma generate
+      - name: Install deps
+        run: npm ci
 
-      # 本番DBへマイグレーション適用（5432直結）
+      - name: Prisma generate
+        run: npx prisma generate
+
       - name: Prisma migrate deploy (prod)
-        run: npx prisma migrate deploy
         env:
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+        run: |
+          npx prisma migrate deploy
+          npx prisma migrate status
 
+      # （任意）シードしたい場合だけ
+      # - name: Seed (prod)
+      #   if: ${{ success() }}
+      #   env:
+      #     DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+      #   run: npm run seed
+
+      # （任意）migrate 成功後に Vercel デプロイを起動
+      - name: Trigger Vercel deploy
+        if: ${{ success() && secrets.VERCEL_DEPLOY_HOOK != '' }}
+        run: curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
