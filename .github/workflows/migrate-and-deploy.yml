@@ -48,7 +48,3 @@ jobs:
       #     DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
       #   run: npm run seed
 
-      # （任意）migrate 成功後に Vercel デプロイを起動
-      - name: Trigger Vercel deploy
-        if: ${{ success() && secrets.VERCEL_DEPLOY_HOOK != '' }}
-        run: curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
