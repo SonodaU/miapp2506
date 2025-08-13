@@ -17,8 +17,7 @@ concurrency:
 
 jobs:
   migrate:
-    runs-on: ubuntu-latest
-    environment: production           # （任意）環境保護を使うなら
+    runs-on: uself-hosted
     env:
       DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
     steps:
@@ -37,8 +36,6 @@ jobs:
         run: npx prisma generate
 
       - name: Prisma migrate deploy (prod)
-        env:
-          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
         run: |
           npx prisma migrate deploy
           npx prisma migrate status
