@@ -19,7 +19,8 @@ jobs:
   migrate:
     runs-on: ubuntu-latest
     environment: production           # （任意）環境保護を使うなら
-
+    env:
+      DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
