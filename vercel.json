@@ -1,13 +1,14 @@
 {
+  "version": 2,
   "functions": {
     "api/main.py": {
-      "runtime": "python3.9"
+      "runtime": "python3.12"
     }
   },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/python/(.*)",
-      "dest": "/api/main.py"
+      "source": "/api/python/(.*)",
+      "destination": "/api/main.py"
     }
   ]
 }
