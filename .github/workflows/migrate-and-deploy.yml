@@ -8,6 +8,7 @@ on:
       - "package.json"
       - "package-lock.json"
       - "yarn.lock"
+      - ".github/workflows/**" 
   workflow_dispatch:                  # 手動実行も可
 
 concurrency:
