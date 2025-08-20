@@ -18,6 +18,7 @@ concurrency:
 jobs:
   migrate:
     runs-on: self-hosted
+    environment: production
     env:
       DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
     steps:
