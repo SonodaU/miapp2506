@@ -24,7 +24,6 @@ beautifulsoup4==4.12.2
 billiard==4.2.0
 bleach==6.1.0
 blinker==1.6.3
-bzip2==1.0.8
 ca-certificates==2023.08.22
 cachetools==5.3.1
 celery==5.3.6
