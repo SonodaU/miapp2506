@@ -29,7 +29,7 @@ export const NewAnalysisForm = ({ onAnalyze, isLoading }: NewAnalysisFormProps) 
     if (textLength > 2000) {
       return '解析には時間を要するため、完了後にメールでお知らせします...'
     }
-    return '返信まで1分程度かかることがあります...'
+    return '出力まで時間がかかります...'
   }
 
   // プログレスバーのアニメーション

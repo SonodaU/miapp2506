@@ -11,7 +11,7 @@ from .openai_service import openai_service
 class ChatService:
     """チャット機能サービス"""
     
-    async def detailed_chat(self, request: DetailedChatRequest) -> str:
+    async def detailed_chat(self, request: DetailedChatRequest, api_key: str = None) -> str:
         """詳細分析チャット"""
         system,prompt = PromptManager.get_detailed_chat_prompt(
             text=request.conversation_text,
@@ -66,7 +66,7 @@ class ChatService:
         
         return await openai_service.create_chat_completion(
             messages=messages,
-            api_key=request.api_key,
+            api_key=api_key,
             search = request.use_reference
         )
 

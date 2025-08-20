@@ -33,11 +33,11 @@ async function analyzeConversation(text: string, targetBehavior?: string, apiKey
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(apiKey && { 'X-API-Key': apiKey }),
       },
       body: JSON.stringify({ 
         text,
-        target_behavior: targetBehavior,
-        api_key: apiKey
+        target_behavior: targetBehavior
       }),
       signal: controller.signal,
     })
@@ -133,14 +133,16 @@ async function generateAIResponse(
       user_question: userQuestion,
       chat_history: chatHistory,
       use_reference: useReference,
-      api_key: apiKey,
       statement_index: statementIndex,
       statement_content: statementContent,
     };
     
     console.log('generateAIResponse - Sending to Python API:', {
       url: `${config.pythonApi.url}/detailed-chat`,
-      payload: JSON.stringify(requestPayload, null, 2)
+      payload: JSON.stringify({
+        ...requestPayload,
+        // APIキーをログから除外
+      }, null, 2)
     });
 
     const controller = new AbortController()
@@ -150,6 +152,7 @@ async function generateAIResponse(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(apiKey && { 'X-API-Key': apiKey }),
       },
       body: JSON.stringify(requestPayload),
       signal: controller.signal,
