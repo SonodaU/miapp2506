@@ -11,6 +11,7 @@ on:
       - ".github/workflows/**" 
   workflow_dispatch:                  # 手動実行も可
 
+  
 concurrency:
   group: migrate-prod
   cancel-in-progress: false           # 並走させない（安全）
