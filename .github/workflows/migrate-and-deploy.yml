@@ -11,7 +11,7 @@ on:
       - ".github/workflows/**" 
   workflow_dispatch:                  # 手動実行も可
 
-  
+
 concurrency:
   group: migrate-prod
   cancel-in-progress: false           # 並走させない（安全）
@@ -37,10 +37,30 @@ jobs:
       - name: Prisma generate
         run: npx prisma generate
 
+      - name: Prisma validate & status
+        run: |
+          npx prisma validate
+          npx prisma migrate status --schema prisma/schema.prisma
+      - name: Check drift (fail if diff exists)
+        run: |
+          npx prisma migrate diff \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel prisma/schema.prisma \
+            --script > diff.sql
+          if [ -s diff.sql ]; then
+            echo "❌ Drift detected between DB and schema.prisma"
+            echo "----- BEGIN DIFF -----"
+            head -n 200 diff.sql
+            echo "------ END DIFF ------"
+            exit 1
+          fi
+
+
       - name: Prisma migrate deploy (prod)
         run: |
           npx prisma migrate deploy
           npx prisma migrate status
+
 
       # （任意）シードしたい場合だけ
       # - name: Seed (prod)
