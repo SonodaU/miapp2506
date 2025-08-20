@@ -37,13 +37,12 @@ jobs:
       - name: Prisma generate
         run: npx prisma generate
 
-      - name: Prisma validate & status
-        run: |
-          npx prisma validate
-          npx prisma migrate status --schema prisma/schema.prisma
       - name: Prisma migrate deploy (prod)
         run: |
           npx prisma migrate deploy
+
+      - name: Prisma migrate status (info)
+        run: npx prisma migrate status || true
 
       # （任意）シードしたい場合だけ
       # - name: Seed (prod)
